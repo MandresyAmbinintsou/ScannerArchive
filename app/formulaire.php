@@ -4,6 +4,7 @@ require_once 'auth.php';
 
 $message = '';
 $error = '';
+$firstSetup = !hasUsers();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username']);
@@ -17,7 +18,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (strlen($password) < 6) {
         $error = 'Le mot de passe doit contenir au moins 6 caractères.';
     } else {
-        if (createUser($username, $password, 'user')) {
+        $role = $firstSetup ? 'admin' : 'user';
+        if (createUser($username, $password, $role)) {
             $message = 'Compte créé avec succès ! <a href="login.php">Se connecter</a>';
         } else {
             $error = 'Erreur lors de la création du compte. Le nom d\'utilisateur existe peut-être déjà.';
@@ -49,7 +51,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
     <div class="form-card">
         <h2>Créer un compte</h2>
-        <p style="text-align: center; color: #7f8c8d; margin-bottom: 20px;">Créez votre compte utilisateur :</p>
+        <p style="text-align: center; color: #7f8c8d; margin-bottom: 20px;">
+            Créez votre compte utilisateur.
+            <?php if ($firstSetup): ?>
+                <strong>Le premier compte sera administrateur.</strong>
+            <?php endif; ?>
+        </p>
         <?php if ($error): ?>
             <div class="error"><?php echo $error; ?></div>
         <?php endif; ?>

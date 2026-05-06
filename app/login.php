@@ -1,16 +1,21 @@
 <?php
 require_once 'auth.php';
 
-// Si aucun utilisateur n'existe, rediriger vers la configuration initiale
+if (isset($_SESSION['username'])) {
+    header('Location: ../index.php');
+    exit;
+}
+
+// Si aucun utilisateur n'existe, inviter à créer le premier compte.
 if (!hasUsers()) {
-    header('Location: setup.php');
+    header('Location: formulaire.php');
     exit;
 }
 
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (login($_POST['username'], $_POST['password'])) {
-        header('Location: index.php');
+        header('Location: ../index.php');
         exit;
     } else {
         $error = "Identifiants incorrects";
@@ -52,8 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <button type="submit">Se connecter</button>
         </form>
         <p style="margin-top: 20px; color: #7f8c8d; font-size: 14px; text-align: center;">
-            Comptes par défaut : <strong>admin/admin123</strong> (admin) ou <strong>user/user123</strong> (utilisateur).<br>
-            <a href="formulaire.php" style="color: #3498db; text-decoration: none;">Créer un compte</a>
+            Pas de compte ? <a href="formulaire.php" style="color: #3498db; text-decoration: none;">Créer un compte</a>
         </p>
     </div>
 </body>

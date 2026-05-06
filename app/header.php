@@ -44,8 +44,8 @@ $baseHref = $baseHref ?? '';
                     <i class="fas fa-database text-xl"></i>
                 </div>
                 <div>
-                    <h1 class="text-lg font-black uppercase tracking-widest leading-none text-slate-900 dark:text-white">GED <span class="text-indigo-600 dark:text-indigo-400">System</span></h1>
-                    <p class="text-[9px] font-bold text-slate-400 dark:text-slate-500 mt-1 uppercase tracking-[0.3em]">-MEF</p>
+                    <h1 class="text-lg font-black uppercase tracking-widest leading-none text-slate-900 dark:text-white">GED <span class="text-indigo-600 dark:text-indigo-400">-MEF</span></h1>
+                    <p class="text-[9px] font-bold text-slate-400 dark:text-slate-500 mt-1 uppercase tracking-[0.3em]">Systeme nu</p>
                 </div>
             </a>
 
@@ -53,6 +53,12 @@ $baseHref = $baseHref ?? '';
             <nav class="hidden md:flex items-center gap-10 text-[11px] font-black uppercase tracking-[0.3em]">
                 <a href="<?= $baseHref ?>index.php" class="transition <?= ($currentPage ?? '') === 'index' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white' ?>">Répertoire</a>
                 <a href="<?= $baseHref ?>app/indexer.php" class="transition <?= ($currentPage ?? '') === 'indexer' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white' ?>">Indexation</a>
+                <?php if (!isset($_SESSION['username'])): ?>
+                    <a href="<?= $baseHref ?>app/login.php" class="transition text-slate-500 hover:text-slate-900 dark:hover:text-white">Connexion</a>
+                    <a href="<?= $baseHref ?>app/formulaire.php" class="transition text-slate-500 hover:text-slate-900 dark:hover:text-white">Inscription</a>
+                <?php elseif (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
+                    <a href="<?= $baseHref ?>app/gestion_compte.php" class="transition text-slate-500 hover:text-slate-900 dark:hover:text-white">Gestion comptes</a>
+                <?php endif; ?>
             </nav>
 
             <!-- Actions & Theme Toggle -->

@@ -2,7 +2,6 @@
 // gestion_compte.php - Gestion des comptes utilisateurs
 require_once 'auth.php';
 check_admin();
-require_once 'config/database.php';
 
 $message = '';
 $error = '';
@@ -12,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
     $password = $_POST['new_password'];
     $role = $_POST['new_role'];
 
-    if (empty($username) || empty($password) || !in_array($role, ['user', 'admin'])) {
+    if (empty($username) || empty($password) || !in_array($role, ['user', 'admin'], true)) {
         $error = 'Tous les champs sont requis et le rôle doit être valide.';
     } elseif (strlen($password) < 6) {
         $error = 'Le mot de passe doit contenir au moins 6 caractères.';
@@ -25,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
     }
 }
 
-$db = Database::getInstance();
+$db = getDB();
 
 // Migrer les mots de passe vides (de l'ancien compte créé)
 try {
@@ -35,7 +34,8 @@ try {
 
 $pageTitle = "Gestion des comptes - Administration";
 $currentPage = 'gestion_compte';
-include 'templates/header.php';
+$baseHref = '../';
+require_once __DIR__ . '/../app/header.php';
 ?>
 
     <style>
@@ -228,7 +228,7 @@ include 'templates/header.php';
     </div>
 
     <div style="text-align: center; margin-top: 20px;">
-        <a href="admin.php" class="btn btn-primary">Retour à l'administration</a>
+        <a href="<?= $baseHref ?>index.php" class="btn btn-primary">Retour à l'administration</a>
     </div>
 
-<?php include 'templates/footer.php'; ?>
+<?php require_once __DIR__ . '/../app/footer.php'; ?>

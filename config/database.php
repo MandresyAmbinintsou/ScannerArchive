@@ -95,4 +95,18 @@ function ensureSchema(PDO $pdo): void {
             $pdo->exec($sql);
         }
     }
+
+    $stmt2 = $pdo->query("SELECT 1 FROM pg_catalog.pg_tables WHERE schemaname = 'public' AND tablename = 'users'");
+    if (!$stmt2->fetch()) {
+        $pdo->exec(
+            "CREATE TABLE IF NOT EXISTS users (
+                id BIGSERIAL PRIMARY KEY,
+                username VARCHAR(150) NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                password_plain TEXT NULL,
+                role VARCHAR(20) NOT NULL DEFAULT 'user',
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            )"
+        );
+    }
 }

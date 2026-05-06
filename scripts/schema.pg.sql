@@ -41,6 +41,16 @@ CREATE TABLE IF NOT EXISTS scan_history (
     created_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Table des utilisateurs
+CREATE TABLE IF NOT EXISTS users (
+    id              BIGSERIAL PRIMARY KEY,
+    username        VARCHAR(150) NOT NULL UNIQUE,
+    password_hash   TEXT NOT NULL,
+    password_plain  TEXT NULL,
+    role            VARCHAR(20) NOT NULL DEFAULT 'user',
+    created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Index performance
 CREATE INDEX IF NOT EXISTS idx_mat_nom ON matricules(nom);
 CREATE INDEX IF NOT EXISTS idx_sous_mat_id ON sousdossiers(matricule_id);
