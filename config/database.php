@@ -1,12 +1,17 @@
 <?php
 // ============================================================
-// config/database.php — Connexion PostgreSQL
+// config/database.php — Connexion PostgreSQL avec Auto-Setup
 // ============================================================
 
 define('DB_HOST', getenv('DB_HOST') ?: getenv('PGHOST') ?: '');
 define('DB_PORT', getenv('DB_PORT') ?: getenv('PGPORT') ?: '5432');
 define('DB_NAME', getenv('DB_NAME') ?: 'archive_db');
-define('DB_USER', getenv('DB_USER') ?: getenv('PGUSER') ?: 'postgres');
+
+$defaultDbUser = getenv('DB_USER') ?: getenv('PGUSER');
+if ($defaultDbUser === false || $defaultDbUser === '') {
+    $defaultDbUser = getenv('USER') ?: getenv('LOGNAME') ?: get_current_user();
+}
+define('DB_USER', $defaultDbUser ?: 'postgres');
 
 $pgpass = getenv('DB_PASS') ?: getenv('PGPASSWORD');
 define('DB_PASS', $pgpass !== false ? $pgpass : '');
@@ -19,26 +24,75 @@ if (!$defaultArchiveRoot) {
         $defaultArchiveRoot = getenv('HOME') ? getenv('HOME') . '/archive' : '/data/archive';
     }
 }
+define('ARCHIVE_ROOT', $defaultArchiveRoot);
 
-define('ARCHIVE_ROOT', $defaultArchiveRoot);  // Peut être remplacé par la variable d'environnement ARCHIVE_ROOT
-
+/**
+ * Retourne une instance PDO, crée la base et les tables si nécessaire.
+ */
 function getDB(): PDO {
     static $pdo = null;
     if ($pdo === null) {
-        if (DB_HOST === '') {
-            $dsn = sprintf('pgsql:dbname=%s', DB_NAME);
-        } elseif (DB_HOST[0] === '/') {
-            // Utilisation d'un socket UNIX personnalisé
-            $dsn = sprintf('pgsql:host=%s;dbname=%s', DB_HOST, DB_NAME);
-        } else {
-            $dsn = sprintf('pgsql:host=%s;port=%s;dbname=%s', DB_HOST, DB_PORT, DB_NAME);
+        $dsnApp = buildDsn(DB_NAME);
+        $dsnSystem = buildDsn('postgres');
+
+        try {
+            // 1. Tenter de se connecter à la base de l'application
+            $pdo = new PDO($dsnApp, DB_USER, DB_PASS, [
+                PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_PERSISTENT         => true,
+            ]);
+        } catch (PDOException $e) {
+            // Code 08006 ou message "does not exist" = Base manquante
+            if (strpos($e->getMessage(), 'does not exist') !== false || $e->getCode() == '08006') {
+                try {
+                    // 2. Se connecter à la base système 'postgres' pour créer 'archive_db'
+                    $tempPdo = new PDO($dsnSystem, DB_USER, DB_PASS, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+                    $tempPdo->exec("CREATE DATABASE " . DB_NAME);
+                    $tempPdo = null;
+
+                    // 3. Se reconnecter à la base nouvellement créée
+                    $pdo = new PDO($dsnApp, DB_USER, DB_PASS, [
+                        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+                        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    ]);
+                } catch (PDOException $e2) {
+                    throw new RuntimeException("Erreur lors de la création automatique de la base : " . $e2->getMessage());
+                }
+            } else {
+                throw $e;
+            }
         }
 
-        $pdo = new PDO($dsn, DB_USER, DB_PASS, [
-            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_PERSISTENT         => true,  // connexion persistante = plus rapide
-        ]);
+        // 4. Vérifier et créer le schéma si les tables sont absentes
+        ensureSchema($pdo);
     }
     return $pdo;
+}
+
+/**
+ * Construit le DSN PostgreSQL selon le host
+ */
+function buildDsn(string $dbname): string {
+    if (DB_HOST === '') {
+        return sprintf('pgsql:dbname=%s', $dbname);
+    } elseif (DB_HOST[0] === '/') {
+        return sprintf('pgsql:host=%s;dbname=%s', DB_HOST, $dbname);
+    } else {
+        return sprintf('pgsql:host=%s;port=%s;dbname=%s', DB_HOST, DB_PORT, $dbname);
+    }
+}
+
+/**
+ * Crée les tables à partir du fichier SQL si la table 'matricules' n'existe pas.
+ */
+function ensureSchema(PDO $pdo): void {
+    $stmt = $pdo->query("SELECT 1 FROM pg_catalog.pg_tables WHERE schemaname = 'public' AND tablename = 'matricules'");
+    if (!$stmt->fetch()) {
+        $schemaFile = __DIR__ . '/../scripts/schema.pg.sql';
+        if (file_exists($schemaFile)) {
+            $sql = file_get_contents($schemaFile);
+            $pdo->exec($sql);
+        }
+    }
 }

@@ -1,86 +1,67 @@
 @echo off
 setlocal enabledelayedexpansion
 
-set ROOT=%~dp0
-set APP_DIR=%ROOT%app
+REM ============================================================
+REM Archive Viewer - Lanceur Portable Windows
+REM ============================================================
 
-if exist "%ROOT%env.bat" (
-  call "%ROOT%env.bat"
+REM On remonte de deux niveaux pour atteindre la racine du projet
+set PROJECT_ROOT=%~dp0..\..\
+cd /d "%PROJECT_ROOT%"
+
+echo === Archive Viewer (GED-MEF) - Windows Portable ===
+
+REM 1. Chargement de la configuration
+if exist "portable\windows\env.bat" (
+  call "portable\windows\env.bat"
 ) else (
-  call "%ROOT%env.example.bat"
+  call "portable\windows\env.example.bat"
 )
 
-set PHP_EXE=%ROOT%php\php.exe
-set PG_CTL=%ROOT%postgres\bin\pg_ctl.exe
-set INITDB=%ROOT%postgres\bin\initdb.exe
-set PSQL=%ROOT%postgres\bin\psql.exe
+REM 2. Détection des binaires (priorité au local portable, puis au PATH)
+set PHP_EXE=php
+if exist "php\php.exe" set PHP_EXE="%PROJECT_ROOT%php\php.exe"
 
-if not exist "%APP_DIR%\index.php" (
-  echo [ERREUR] Projet introuvable: %APP_DIR%\index.php
-  echo Copie ce repo dans %APP_DIR%
-  pause
-  exit /b 1
-)
+set PG_CTL=pg_ctl
+if exist "postgres\bin\pg_ctl.exe" set PG_CTL="%PROJECT_ROOT%postgres\bin\pg_ctl.exe"
 
-if not exist "%PHP_EXE%" (
-  echo [ERREUR] PHP introuvable: %PHP_EXE%
-  echo Place PHP portable dans %ROOT%php\
-  pause
-  exit /b 1
-)
+set INITDB=initdb
+if exist "postgres\bin\initdb.exe" set INITDB="%PROJECT_ROOT%postgres\bin\initdb.exe"
 
-if not exist "%PG_CTL%" (
-  echo [ERREUR] PostgreSQL introuvable: %PG_CTL%
-  echo Place PostgreSQL portable dans %ROOT%postgres\
-  pause
-  exit /b 1
-)
-
-set DATA_DIR=%ROOT%data
-set LOG_DIR=%ROOT%logs
-set PG_LOG=%LOG_DIR%\postgres.log
-set WEB_LOG=%LOG_DIR%\php-web.log
-if not exist "%LOG_DIR%" mkdir "%LOG_DIR%" >NUL 2>&1
-
-REM Init DB si nécessaire
-if not exist "%DATA_DIR%\PG_VERSION" (
-  echo [INFO] Initialisation PostgreSQL...
-  if not exist "%DATA_DIR%" mkdir "%DATA_DIR%" >NUL 2>&1
-  "%INITDB%" -D "%DATA_DIR%" -U postgres -A trust > "%PG_LOG%" 2>&1
-  if errorlevel 1 (
-    echo [ERREUR] initdb a echoue. Voir: %PG_LOG%
+REM 3. Vérification de PHP
+"%PHP_EXE%" -v >nul 2>&1
+if errorlevel 1 (
+    echo [ERREUR] PHP n'est pas installe ou n'est pas dans le dossier /php/
     pause
     exit /b 1
-  )
 )
 
-REM Start PostgreSQL
-echo [INFO] Demarrage PostgreSQL (port %PG_PORT%)...
-"%PG_CTL%" -D "%DATA_DIR%" -o "-p %PG_PORT% -c listen_addresses=127.0.0.1" -l "%PG_LOG%" start >NUL 2>&1
-
-REM Appliquer schema
-echo [INFO] Application schema PostgreSQL...
-set PGPASSWORD=%DB_PASS%
-"%PSQL%" -h %DB_HOST% -p %DB_PORT% -U %DB_USER% -d %DB_NAME% -c "SELECT 1" >NUL 2>&1
-if errorlevel 1 (
-  echo [INFO] Creation DB %DB_NAME%...
-  "%PSQL%" -h %DB_HOST% -p %DB_PORT% -U %DB_USER% -d postgres -c "CREATE DATABASE %DB_NAME%;" >> "%PG_LOG%" 2>&1
+REM 4. Gestion de PostgreSQL (si version portable détectée)
+if exist "postgres\bin\pg_ctl.exe" (
+    set DATA_DIR=%PROJECT_ROOT%data
+    if not exist "!DATA_DIR!\PG_VERSION" (
+        echo [INFO] Initialisation de la base de donnees...
+        if not exist "!DATA_DIR!" mkdir "!DATA_DIR!"
+        %INITDB% -D "!DATA_DIR!" -U postgres -A trust
+    )
+    
+    echo [INFO] Demarrage de PostgreSQL sur le port %DB_PORT%...
+    %PG_CTL% -D "!DATA_DIR!" -o "-p %DB_PORT% -c listen_addresses=127.0.0.1" start
+) else (
+    echo [INFO] Utilisation de PostgreSQL systeme (assurez-vous que le service tourne).
 )
-"%PSQL%" -h %DB_HOST% -p %DB_PORT% -U %DB_USER% -d %DB_NAME% -f "%APP_DIR%\scripts\schema.pg.sql" >> "%PG_LOG%" 2>&1
 
-REM Export env pour PHP
+REM 5. Configuration des variables d'environnement pour PHP
 set DB_HOST=%DB_HOST%
 set DB_PORT=%DB_PORT%
 set DB_NAME=%DB_NAME%
 set DB_USER=%DB_USER%
 set DB_PASS=%DB_PASS%
-if not "%ARCHIVE_ROOT%"=="" set ARCHIVE_ROOT=%ARCHIVE_ROOT%
-if not "%GO_SCANNERFS_PATH%"=="" set GO_SCANNERFS_PATH=%GO_SCANNERFS_PATH%
 
-echo [INFO] Demarrage serveur web PHP: http://%WEB_HOST%:%WEB_PORT%/index.php
-pushd "%APP_DIR%"
-"%PHP_EXE%" -S %WEB_HOST%:%WEB_PORT% > "%WEB_LOG%" 2>&1
-popd
+REM 6. Lancement du serveur Web
+echo [INFO] Lancement du serveur : http://%WEB_HOST%:%WEB_PORT%
+echo [INFO] Appuyez sur Ctrl+C pour arreter le serveur.
 
-endlocal
+"%PHP_EXE%" -S %WEB_HOST%:%WEB_PORT% index.php
 
+pause

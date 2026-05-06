@@ -32,8 +32,6 @@ function scanArchiveGo(PDO $db, string $archiveRoot, ?string $scannerPath = null
 
     $archiveRoot = validatePath($archiveRoot);
 
-    truncateArchiveTables($db);
-
     $stmtImg = $db->prepare('INSERT INTO images (sousdossier_id, nom_fichier, chemin_complet) VALUES (?, ?, ?)');
 
     $proc = proc_open(
@@ -64,6 +62,7 @@ function scanArchiveGo(PDO $db, string $archiveRoot, ?string $scannerPath = null
     $warnings = 0;
 
     $db->beginTransaction();
+    truncateArchiveTables($db);
     try {
         while (($line = fgets($pipes[1])) !== false) {
             $line = trim($line);

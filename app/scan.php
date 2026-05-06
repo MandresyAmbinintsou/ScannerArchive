@@ -63,17 +63,17 @@ function scanArchive(PDO $db, string $archiveRoot): string {
     try {
         $allowedExts = ['png' => 1, 'jpg' => 1, 'jpeg' => 1, 'gif' => 1, 'webp' => 1];
 
-        // Optimisation 1 : TRUNCATE au lieu de DELETE (instantané)
+        // Optimisation 2 : Utiliser glob au lieu de readdir (plus rapide)
+        $matriculePatterns = glob($archiveRoot . DIRECTORY_SEPARATOR . '*', GLOB_ONLYDIR);
+        
+        $db->beginTransaction();
+
+        // Optimisation 1 : TRUNCATE au lieu de DELETE (instantané et rollbackable en Postgres)
         truncateArchiveTables($db);
 
         $totalMat = 0;
         $totalSous = 0;
         $totalImg = 0;
-
-        // Optimisation 2 : Utiliser glob au lieu de readdir (plus rapide)
-        $matriculePatterns = glob($archiveRoot . DIRECTORY_SEPARATOR . '*', GLOB_ONLYDIR);
-        
-        $db->beginTransaction();
 
         foreach ($matriculePatterns as $matPath) {
             $matName = basename($matPath);

@@ -1,32 +1,32 @@
 // ============================================================
-// app.js — Navigation SPA sans rechargement de page
+// app.js — Version Finale Robuste (Split-View + Thèmes)
 // ============================================================
 
+const BASE = window.__BASE_HREF__ || '';
 const API = {
-    matricules: 'app/matricules.php',
-    sousdossiers: 'app/sousdossiers.php',
-    images: 'app/images.php',
-    refresh: 'app/refresh.php',
+    matricules: `${BASE}app/matricules.php`,
+    sousdossiers: `${BASE}app/sousdossiers.php`,
+    images: `${BASE}app/images.php`,
+    refresh: `${BASE}app/refresh.php`,
 };
 
-// ── État global ──────────────────────────────────────────────
 const state = {
     page: 1,
     limit: 50,
     search: '',
     searchTimeout: null,
     currentMatricule: null,
-    currentSousDossier: null,
     isLoading: false,
-    hasMore: true,
+    isSplitView: false,
 };
 
-// ── Éléments DOM ────────────────────────────────────────────
 const els = {
+    mainContainer:  document.getElementById('mainContainer'),
+    layoutWrapper:  document.getElementById('layoutWrapper'),
+    sidebarList:    document.getElementById('sidebarList'),
     matriculeList:  document.getElementById('matriculeList'),
     pagination:     document.getElementById('pagination'),
     totalBadge:     document.getElementById('totalBadge'),
-    statsBar:       document.getElementById('statsBar'),
     searchInput:    document.getElementById('searchInput'),
     btnRefresh:     document.getElementById('btnRefresh'),
     placeholder:    document.getElementById('placeholder'),
@@ -45,54 +45,32 @@ const els = {
     lightboxClose:  document.getElementById('lightboxClose'),
 };
 
-// ── Fetch helper ────────────────────────────────────────────
+/**
+ * Helper Fetch
+ */
 async function apiFetch(url, params = {}) {
     const qs = new URLSearchParams(params).toString();
     const res = await fetch(`${url}?${qs}`);
-    if (!res.ok) {
-        let message = `HTTP ${res.status}`;
-        try {
-            const maybeJson = await res.json();
-            message = maybeJson?.message || maybeJson?.error || message;
-        } catch {
-            // ignore
-        }
-        throw new Error(message);
-    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
 }
 
+/**
+ * Scan discret
+ */
 async function refreshArchive() {
     try {
-        const root = (arguments.length > 0 ? arguments[0] : '').trim?.() ?? '';
-        const url = root ? `${API.refresh}?root=${encodeURIComponent(root)}` : API.refresh;
-        const res = await fetch(url, { cache: 'no-store' });
-        const json = await res.json().catch(() => null);
-        if (!res.ok) throw new Error(json?.message || `HTTP ${res.status}`);
-        if (!json?.ok) throw new Error(json?.message || 'Erreur de rafraîchissement');
-        return json;
-    } catch (err) {
-        console.warn('Actualisation échouée :', err?.message || err);
-        return null;
-    }
+        const res = await fetch(API.refresh, { cache: 'no-store' });
+        return await res.json();
+    } catch (err) { return null; }
 }
 
-// ── Charger la liste des matricules ─────────────────────────
-async function loadMatricules(append = false) {
-    if (state.isLoading || (!state.hasMore && append)) return;
-    
+/**
+ * Chargement du répertoire
+ */
+async function loadMatricules() {
+    if (state.isLoading) return;
     state.isLoading = true;
-    if (!append) {
-        state.page = 1;
-        state.hasMore = true;
-        els.matriculeList.innerHTML = '<div class="loading px-4 py-6 text-center text-slate-500">Chargement...</div>';
-    } else {
-        const loader = document.createElement('div');
-        loader.id = 'scroll-loader';
-        loader.className = 'px-4 py-4 text-center text-xs text-slate-500 animate-pulse';
-        loader.textContent = 'Chargement de la suite...';
-        els.matriculeList.appendChild(loader);
-    }
 
     try {
         const data = await apiFetch(API.matricules, {
@@ -103,332 +81,250 @@ async function loadMatricules(append = false) {
 
         const { data: rows, pagination } = data;
         
-        // Retirer le loader
-        const oldLoader = document.getElementById('scroll-loader');
-        if (oldLoader) oldLoader.remove();
+        if (els.totalBadge) els.totalBadge.textContent = `${pagination.total} Items`;
 
-        // Stats
-        if (els.totalBadge) els.totalBadge.textContent = pagination.total.toLocaleString();
-        if (els.statsBar) els.statsBar.textContent = `${pagination.total.toLocaleString()} matricules`;
-
-        if (!append && rows.length === 0) {
-            els.matriculeList.innerHTML = '<div class="empty px-4 py-10 text-center text-slate-500 italic">Aucun résultat</div>';
+        if (rows.length === 0) {
+            els.sidebarList.classList.add('hidden');
+            els.placeholder.classList.remove('hidden');
             return;
         }
 
-        const html = rows.map(m => `
-            <button type="button" class="matricule-item w-full rounded-3xl border border-slate-800 bg-slate-950/95 p-4 text-left transition hover:border-brand hover:bg-slate-900 ${state.currentMatricule?.id === m.id ? 'ring-2 ring-brand/50' : ''}"
-                    data-id="${m.id}" data-nom="${escapeHtml(m.nom)}">
-                <div class="flex items-center justify-between gap-3">
-                    <span class="block max-w-[70%] truncate text-sm font-semibold text-white">${escapeHtml(m.nom)}</span>
-                    <span class="rounded-full bg-slate-800 px-3 py-1 text-xs font-medium text-slate-300">${m.nb_sousdossiers}</span>
+        els.sidebarList.classList.remove('hidden');
+        els.placeholder.classList.add('hidden');
+
+        // Rendu des Matricules (Agrandis & Stylisés)
+        els.matriculeList.innerHTML = rows.map(m => `
+            <div class="matricule-row group flex items-center justify-between rounded-[1.8rem] border-2 border-transparent bg-white dark:bg-slate-800 p-7 transition-all duration-300 hover:border-indigo-500 hover:shadow-2xl cursor-pointer ${state.currentMatricule?.id === m.id ? 'border-indigo-600 bg-indigo-50/50 dark:bg-slate-900 shadow-inner' : ''}"
+                 data-id="${m.id}" data-nom="${escapeHtml(m.nom)}">
+                <div class="flex items-center gap-6 overflow-hidden">
+                    <div class="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl ${state.currentMatricule?.id === m.id ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-100 dark:bg-slate-900 text-slate-400 dark:text-slate-600 group-hover:bg-indigo-500 group-hover:text-white'} transition-all duration-300 font-black text-xl">
+                        <i class="fas fa-folder-tree"></i>
+                    </div>
+                    <div class="truncate">
+                        <div class="text-[20px] font-black text-slate-900 dark:text-white uppercase tracking-tight truncate">${escapeHtml(m.nom)}</div>
+                        <div class="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] mt-2 italic">${m.nb_sousdossiers} Dossiers Archivés</div>
+                    </div>
                 </div>
-            </button>
+                <div class="flex items-center gap-4">
+                    <span class="text-[11px] font-black text-indigo-600 dark:text-indigo-400 opacity-0 group-hover:opacity-100 transition duration-300 uppercase tracking-[0.2em] -translate-x-2 group-hover:translate-x-0">Consulter</span>
+                    <i class="fas fa-chevron-right text-xs text-slate-300 dark:text-slate-600 group-hover:text-indigo-400 transition duration-300"></i>
+                </div>
+            </div>
         `).join('');
 
-        if (append) {
-            els.matriculeList.insertAdjacentHTML('beforeend', html);
-        } else {
-            els.matriculeList.innerHTML = html;
-        }
-
-        // Événements click
+        renderPagination(pagination);
         attachMatriculeEvents();
 
-        state.hasMore = state.page < pagination.totalPages;
-        state.page++;
-
     } catch (err) {
-        els.matriculeList.innerHTML = `<div class="empty">Erreur : ${err.message}</div>`;
+        console.error('Erreur API:', err);
+        els.matriculeList.innerHTML = `<div class="py-20 text-center text-red-500 font-black uppercase text-[10px] tracking-widest italic">Erreur Système : Accès Base Refusé</div>`;
     } finally {
         state.isLoading = false;
     }
 }
 
 function attachMatriculeEvents() {
-    els.matriculeList.querySelectorAll('.matricule-item:not([data-bound])').forEach(el => {
-        el.setAttribute('data-bound', 'true');
+    els.matriculeList.querySelectorAll('.matricule-row').forEach(el => {
         el.addEventListener('click', () => {
-            const id  = parseInt(el.dataset.id);
-            const nom = el.dataset.nom;
-            selectMatricule(id, nom);
-            els.matriculeList.querySelectorAll('.matricule-item').forEach(e => e.classList.remove('ring-2', 'ring-brand/50'));
-            el.classList.add('ring-2', 'ring-brand/50');
+            selectMatricule(parseInt(el.dataset.id), el.dataset.nom);
+            els.matriculeList.querySelectorAll('.matricule-row').forEach(r => r.classList.remove('border-indigo-600', 'bg-indigo-50/50', 'dark:bg-slate-900', 'shadow-inner'));
+            el.classList.add('border-indigo-600', 'bg-indigo-50/50', 'dark:bg-slate-900', 'shadow-inner');
         });
     });
 }
 
-// ── Détection du Scroll ──────────────────────────────────────
-els.matriculeList.addEventListener('scroll', () => {
-    const { scrollTop, scrollHeight, clientHeight } = els.matriculeList;
-    if (scrollTop + clientHeight >= scrollHeight - 50) {
-        loadMatricules(true);
-    }
-});
-
-// ── Pagination ───────────────────────────────────────────────
 function renderPagination({ page, totalPages }) {
     if (totalPages <= 1) { els.pagination.innerHTML = ''; return; }
-
-    const pages = getPaginationRange(page, totalPages);
-    els.pagination.innerHTML = pages.map(p => {
-        if (p === '...') return `<span class="inline-flex items-center rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-500">…</span>`;
-        return `<button type="button" class="page-btn inline-flex items-center justify-center rounded-full px-3 py-2 text-sm transition ${p === page ? 'bg-brand text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}" data-page="${p}">${p}</button>`;
-    }).join('');
-
-    els.pagination.querySelectorAll('.page-btn[data-page]').forEach(btn => {
-        btn.addEventListener('click', () => {
+    
+    let html = '';
+    const range = 1;
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= page - range && i <= page + range)) {
+            html += `<button type="button" class="page-btn inline-flex h-11 w-11 items-center justify-center rounded-xl text-[11px] font-black transition-all duration-300 ${i === page ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/5 text-slate-500 hover:border-indigo-600 hover:text-indigo-600 dark:hover:text-white'}" data-page="${i}">${i}</button>`;
+        } else if (i === page - range - 1 || i === page + range + 1) {
+            html += `<span class="px-2 text-slate-400 text-xs">...</span>`;
+        }
+    }
+    els.pagination.innerHTML = html;
+    els.pagination.querySelectorAll('.page-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
             state.page = parseInt(btn.dataset.page);
             loadMatricules();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         });
     });
 }
 
-function getPaginationRange(current, total) {
-    const delta = 2;
-    const range = [];
-    const rangeWithDots = [];
-    let l;
-    for (let i = 1; i <= total; i++) {
-        if (i === 1 || i === total || (i >= current - delta && i <= current + delta)) {
-            range.push(i);
-        }
-    }
-    for (let i of range) {
-        if (l) {
-            if (i - l === 2) rangeWithDots.push(l + 1);
-            else if (i - l !== 1) rangeWithDots.push('...');
-        }
-        rangeWithDots.push(i);
-        l = i;
-    }
-    return rangeWithDots;
-}
-
-// ── Sélectionner un matricule ────────────────────────────────
+/**
+ * Sélection d'un matricule
+ */
 async function selectMatricule(id, nom) {
+    if (state.currentMatricule?.id === id) return;
     state.currentMatricule = { id, nom };
-    state.currentSousDossier = null;
-
-    els.placeholder.style.display    = 'none';
-    els.detailView.style.display     = 'block';
-    els.galerieSection.style.display = 'none';
-    els.detailTitle.textContent      = nom;
-    els.sousdossierGrid.innerHTML    = '<div class="loading">Chargement des dossiers...</div>';
+    state.isSplitView = true;
+    
+    // Transition fluide du layout
+    els.mainContainer.classList.replace('max-w-6xl', 'max-w-[1700px]');
+    els.layoutWrapper.classList.replace('flex-col', 'md:flex-row');
+    els.layoutWrapper.classList.add('items-start');
+    
+    els.sidebarList.classList.remove('w-full');
+    els.sidebarList.classList.add('md:w-[450px]', 'shrink-0');
+    
+    // Affichage immédiat du loader dans la vue détail
+    els.detailView.classList.remove('hidden');
+    els.detailTitle.textContent = nom;
+    els.sousdossierGrid.innerHTML = `
+        <div class="col-span-full py-32 text-center">
+            <div class="inline-flex h-16 w-16 items-center justify-center rounded-full border-4 border-indigo-600/20 border-t-indigo-600 animate-spin mb-6"></div>
+            <p class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 animate-pulse">Récupération des dossiers...</p>
+        </div>
+    `;
+    els.galerieSection.classList.add('hidden');
 
     try {
         const data = await apiFetch(API.sousdossiers, { matricule_id: id });
         const rows = data.data;
 
         if (rows.length === 0) {
-            els.sousdossierGrid.innerHTML = '<div class="empty">Aucun sous-dossier</div>';
+            els.sousdossierGrid.innerHTML = `
+                <div class="col-span-full py-20 text-center rounded-3xl border-2 border-dashed border-slate-200 dark:border-white/5">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Aucun sous-dossier trouvé</p>
+                </div>
+            `;
             return;
         }
 
-        const icons = {
-            affectation: 'clipboard-document',
-            avance: 'banknotes',
-            promotion: 'arrow-up',
-            vacances: 'sun',
-            supplement: 'plus',
-            risque: 'exclamation-triangle',
-            arretees: 'ban',
-            decisionnaire: 'user-group',
-            note: 'document-text',
-            default: 'folder'
-        };
-
-        const iconPaths = {
-            'clipboard-document': 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
-            'banknotes': 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2-2H3a2 2 0 00-2 2v6a2 2 0 002 2h2.5a1 1 0 00.83-.445l1.415-1.415a1 1 0 011.41 0l1.415 1.415a1 1 0 00.83.445H17a2 2 0 002-2v-2a2 2 0 00-2-2zM9 11a1 1 0 11-2 0 1 1 0 012 0zM9 15a1 1 0 11-2 0 1 1 0 012 0zM13 11a1 1 0 11-2 0 1 1 0 012 0zM13 15a1 1 0 11-2 0 1 1 0 012 0z',
-            'arrow-up': 'M5 10l7-7m0 0l7 7m-7-7v18',
-            'sun': 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z',
-            'plus': 'M12 6v6m0 0v6m0-6h6m-6 0H6',
-            'exclamation-triangle': 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z',
-            'ban': 'M18.364 18.364A9 9 0 005.636 5.636m0 0A9.009 9.009 0 0012 15a9.009 9.009 0 006.364-2.636zM9.152 9.152a4 4 0 005.696 0M9.152 9.152a4 4 0 015.696 5.696',
-            'user-group': 'M17 20h5a2 2 0 002 2v-4.372a6.973 6.983 0 00-2.02-4.943l-.004-.003a6.959 6.959 0 00-11.968 0l-.004.003A6.973 6.983 0 003 16.628V22a2 2 0 002 2h5M12 13a4 4 0 100-8 4 0 000 8z',
-            'document-text': 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
-            'folder': 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H9a1 1 0 01-.9-.55L6.9 4.45A1 1 0 006 4H3a2 2 0 00-2 2z',
-            'default': 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H9a1 1 0 01-.9-.55L6.9 4.45A1 1 0 006 4H3a2 2 0 00-2 2z'
-        };
-
-        els.sousdossierGrid.innerHTML = rows.map(s => {
-            const key  = s.nom.toLowerCase().split(' ')[0];
-            const iconKey = icons[key] || 'default';
-            const iconPath = iconPaths[iconKey];
-            return `
-                <button type="button" class="sous-card group w-full rounded-3xl border border-slate-800 bg-slate-950/95 p-5 text-left transition hover:border-brand hover:bg-slate-900" data-id="${s.id}" data-nom="${escapeHtml(s.nom)}">
-                    <div class="flex items-start gap-4">
-                        <svg class="flex h-12 w-12 items-center justify-center rounded-3xl bg-slate-900 text-brand shadow-lg shadow-brand/10" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="${iconPath}"/>
-                        </svg>
-                        <div class="min-w-0 flex-1">
-                            <div class="text-sm font-semibold text-white">${escapeHtml(s.nom)}</div>
-                            <div class="mt-2 text-xs text-slate-400">${s.nb_images} image${s.nb_images > 1 ? 's' : ''}</div>
-                        </div>
-                    </div>
-                </button>
-            `;
-        }).join('');
+        // Sous-dossiers miniaturisés
+        els.sousdossierGrid.innerHTML = rows.map(s => `
+            <button type="button" class="sous-card group relative flex flex-col items-center justify-center rounded-2xl border border-slate-200 dark:border-white/5 bg-white dark:bg-slate-800 p-5 text-center transition-all duration-500 hover:border-indigo-600 hover:shadow-xl hover:-translate-y-1" data-id="${s.id}" data-nom="${escapeHtml(s.nom)}">
+                <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-900 text-indigo-500 transition-all duration-500 group-hover:bg-indigo-600 group-hover:text-white group-hover:rotate-6">
+                    <i class="fas fa-folder-open text-lg"></i>
+                </div>
+                <div class="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tight truncate w-full px-1">${escapeHtml(s.nom)}</div>
+                <div class="mt-2 text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest italic">${s.nb_images} Images</div>
+            </button>
+        `).join('');
 
         els.sousdossierGrid.querySelectorAll('.sous-card').forEach(card => {
-            card.addEventListener('click', () => {
-                const id  = parseInt(card.dataset.id);
-                const nom = card.dataset.nom;
-                els.sousdossierGrid.querySelectorAll('.sous-card').forEach(c => c.classList.remove('ring-2', 'ring-brand/50'));
-                card.classList.add('ring-2', 'ring-brand/50');
-                loadGalerie(id, nom);
-            });
+            card.addEventListener('click', () => loadGalerie(parseInt(card.dataset.id), card.dataset.nom));
         });
 
     } catch (err) {
-        els.sousdossierGrid.innerHTML = `<div class="empty">Erreur : ${err.message}</div>`;
+        console.error('Erreur Sous-dossiers:', err);
+        els.sousdossierGrid.innerHTML = `<div class="col-span-full py-10 text-center text-red-500 font-black uppercase text-[10px] border border-red-100 rounded-2xl bg-red-50/50">Erreur de chargement des données</div>`;
     }
 }
 
-// ── Charger la galerie ───────────────────────────────────────
+/**
+ * Galerie
+ */
 async function loadGalerie(sousDossierId, nom) {
-    state.currentSousDossier = { id: sousDossierId, nom };
-    els.galerieSection.style.display = 'block';
-    els.galerieTitle.textContent     = nom;
-    els.galerieGrid.innerHTML        = '<div class="loading">Chargement des images...</div>';
+    els.galerieSection.classList.remove('hidden');
+    els.galerieTitle.textContent = nom;
+    els.galerieGrid.innerHTML = `
+        <div class="col-span-full py-10 text-center">
+            <i class="fas fa-circle-notch animate-spin text-indigo-400 mb-2"></i>
+            <p class="text-[9px] font-black text-indigo-400/60 uppercase tracking-widest italic">Chargement des visuels...</p>
+        </div>
+    `;
 
-    // Scroll vers la galerie
-    els.galerieSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    els.galerieSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
     try {
         const data = await apiFetch(API.images, { sousdossier_id: sousDossierId });
         const rows = data.data;
 
         if (rows.length === 0) {
-            els.galerieGrid.innerHTML = '<div class="empty">Aucune image</div>';
+            els.galerieGrid.innerHTML = `<div class="col-span-full py-10 text-center text-slate-500 text-[10px] font-black uppercase">Aucune image disponible</div>`;
             return;
         }
 
         els.galerieGrid.innerHTML = rows.map(img => `
-            <button type="button" class="img-card group overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/95 text-left transition hover:border-brand" data-url="${img.url}" data-nom="${escapeHtml(img.nom_fichier)}">
-                <img class="h-48 w-full object-cover transition duration-300 group-hover:scale-105" src="${img.url}" alt="${escapeHtml(img.nom_fichier)}" loading="lazy">
-                <div class="border-t border-slate-800 px-4 py-3 text-sm text-slate-300">${escapeHtml(img.nom_fichier)}</div>
+            <button type="button" class="img-card group relative aspect-square overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-900 shadow-lg border border-white/5" data-url="${img.url}" data-nom="${escapeHtml(img.nom_fichier)}">
+                <img class="h-full w-full object-cover transition duration-700 group-hover:scale-110 opacity-80 dark:opacity-50 group-hover:opacity-100" src="${img.url}" alt="${escapeHtml(img.nom_fichier)}" loading="lazy">
+                <div class="absolute inset-0 bg-indigo-600/10 opacity-0 group-hover:opacity-100 transition duration-500"></div>
             </button>
         `).join('');
 
         els.galerieGrid.querySelectorAll('.img-card').forEach(card => {
-            card.addEventListener('click', () => {
-                openLightbox(card.dataset.url, card.dataset.nom);
-            });
+            card.addEventListener('click', () => openLightbox(card.dataset.url, card.dataset.nom));
         });
 
     } catch (err) {
-        els.galerieGrid.innerHTML = `<div class="empty">Erreur : ${err.message}</div>`;
+        els.galerieGrid.innerHTML = `<div class="col-span-full text-center text-red-500 font-black uppercase text-[10px]">Erreur Galerie</div>`;
     }
 }
 
-// ── Lightbox ─────────────────────────────────────────────────
 function openLightbox(url, nom) {
-    els.lightboxImg.src         = url;
+    els.lightboxImg.src = url;
     els.lightboxCaption.textContent = nom;
-    els.lightbox.style.display  = 'flex';
+    els.lightbox.classList.remove('hidden');
+    els.lightbox.classList.add('flex');
     document.body.style.overflow = 'hidden';
 }
 function closeLightbox() {
-    els.lightbox.style.display  = 'none';
-    els.lightboxImg.src         = '';
+    els.lightbox.classList.add('hidden');
+    els.lightbox.classList.remove('flex');
+    els.lightboxImg.src = '';
     document.body.style.overflow = '';
 }
 
-// ── Événements ───────────────────────────────────────────────
+// RETOUR : Reset layout
 els.btnBack.addEventListener('click', () => {
-    els.detailView.style.display  = 'none';
-    els.placeholder.style.display = 'flex';
     state.currentMatricule = null;
-    els.matriculeList.querySelectorAll('.matricule-item').forEach(e => e.classList.remove('active'));
+    state.isSplitView = false;
+    
+    els.detailView.classList.add('hidden');
+    els.mainContainer.classList.replace('max-w-[1700px]', 'max-w-6xl');
+    els.layoutWrapper.classList.replace('md:flex-row', 'flex-col');
+    els.layoutWrapper.classList.remove('items-start');
+    
+    els.sidebarList.classList.remove('md:w-[450px]', 'shrink-0');
+    els.sidebarList.classList.add('w-full');
+    
+    els.matriculeList.querySelectorAll('.matricule-row').forEach(r => r.classList.remove('border-indigo-600', 'bg-indigo-50/50', 'dark:bg-slate-900', 'shadow-inner'));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
-els.btnCloseGalerie.addEventListener('click', () => {
-    els.galerieSection.style.display = 'none';
-    els.sousdossierGrid.querySelectorAll('.sous-card').forEach(c => c.classList.remove('active'));
+// Supprimé : L'effet de survol qui masquait la vue détail car il nuisait à l'expérience "côte à côte"
+
+els.btnCloseGalerie?.addEventListener('click', () => {
+    els.galerieSection.classList.add('hidden');
 });
 
-els.lightboxClose.addEventListener('click', closeLightbox);
-els.lightboxOverlay.addEventListener('click', closeLightbox);
+els.lightboxClose?.addEventListener('click', closeLightbox);
+els.lightboxOverlay?.addEventListener('click', closeLightbox);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
 
-// Recherche avec debounce (300ms)
 els.searchInput?.addEventListener('input', () => {
     clearTimeout(state.searchTimeout);
     state.searchTimeout = setTimeout(() => {
-        state.search = els.searchInput?.value?.trim?.() ?? '';
-        state.page   = 1;
+        state.search = els.searchInput.value.trim();
+        state.page = 1;
         loadMatricules();
     }, 300);
 });
 
-// Recharger la liste quand la page redevient visible ou est réactualisée
-window.addEventListener('pageshow', () => {
-    loadMatricules();
-});
-window.addEventListener('focus', () => {
-    loadMatricules();
-});
-
-// ── Utilitaires ──────────────────────────────────────────────
-function escapeHtml(str) {
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-}
-
-// ── Init ─────────────────────────────────────────────────────
-window.addEventListener('load', () => {
-    loadMatricules();
-    initWebSocket();
-    // Scan intelligent en arrière-plan
-    refreshArchive().then(() => loadMatricules());
-});
-
-// ── WebSocket & Temps Réel ──────────────────────────────────
-function initWebSocket() {
-    const isSwoole = window.location.port === '8000'; // Par convention pour notre serveur Swoole
-    if (!isSwoole) return;
-
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const socket = new WebSocket(`${protocol}//${window.location.host}`);
-
-    socket.onopen = () => console.log('Connecté au serveur de temps réel (Swoole)');
-    
-    socket.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        if (msg.type === 'progress') {
-            if (els.statsBar) {
-                els.statsBar.innerHTML = `<svg class="inline w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>${msg.message} (${msg.percent}%)`;
-                els.statsBar.classList.add('animate-pulse', 'text-brand');
-            }
-        }
-        if (msg.type === 'finish') {
-            if (els.statsBar) {
-                els.statsBar.textContent = msg.message;
-                els.statsBar.classList.remove('animate-pulse', 'text-brand');
-            }
-            loadMatricules();
-        }
-    };
-
-    // Exposer une fonction globale pour déclencher le scan via WS
-    window.triggerScan = () => {
-        socket.send(JSON.stringify({ action: 'start_scan' }));
-    };
-}
-
-// ── Événements additionnels ──────────────────────────────────
 els.btnRefresh?.addEventListener('click', async () => {
     els.btnRefresh.classList.add('animate-spin');
-    if (window.triggerScan && window.location.port === '8000') {
-        window.triggerScan();
-    } else {
-        await refreshArchive();
-        loadMatricules();
-    }
+    await refreshArchive();
+    loadMatricules();
     setTimeout(() => els.btnRefresh.classList.remove('animate-spin'), 1000);
 });
+
+/**
+ * Initialisation
+ */
+window.addEventListener('DOMContentLoaded', () => {
+    loadMatricules();
+    // Le refresh automatique au chargement est désactivé car il vide la DB à chaque F5
+    // refreshArchive().then(res => {
+    //     if (res && res.ok) loadMatricules();
+    // });
+});
+
+function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+}

@@ -1,90 +1,115 @@
 <?php
-$pageTitle = "Archive Viewer - GED-MEF";
+$pageTitle = "Répertoire - GED-MEF";
 $currentPage = "index";
 require_once 'app/header.php';
 ?>
 
-<div class="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-    <div class="absolute -top-24 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-brand/10 blur-3xl"></div>
-    <div class="absolute -bottom-24 right-[-120px] h-[420px] w-[420px] rounded-full bg-indigo-500/10 blur-3xl"></div>
-    <div class="absolute -bottom-36 left-[-120px] h-[360px] w-[360px] rounded-full bg-sky-500/10 blur-3xl"></div>
-</div>
-
-<main class="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-    <aside class="space-y-4">
-        <div class="rounded-[32px] border border-slate-800 bg-slate-900/95 p-5 shadow-xl shadow-slate-950/40">
-            <div class="flex items-center justify-between gap-3">
-                <div>
-                    <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Matricules</p>
-                    <h2 class="mt-2 text-2xl font-semibold text-white">Liste</h2>
-                </div>
-                <div id="totalBadge" class="rounded-full bg-brand px-3 py-1 text-sm font-semibold text-white">0</div>
-            </div>
-
-            <div class="mt-4 flex items-center gap-3">
-                <label class="sr-only" for="searchInput">Rechercher</label>
-                <input id="searchInput" type="search" placeholder="Rechercher un matricule…"
-                       class="w-full rounded-3xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-slate-200 placeholder:text-slate-500 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/30">
-                <button id="btnRefresh" type="button" title="Rafraîchir"
-                        class="inline-flex h-11 w-11 items-center justify-center rounded-3xl border border-slate-800 bg-slate-950/80 text-slate-200 transition hover:bg-slate-800">
-                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v6h6M20 20v-6h-6M5.64 18.36A9 9 0 1018.36 5.64"></path>
-                    </svg>
-                </button>
-            </div>
-
-            <div id="statsBar" class="mt-3 text-sm text-slate-400"></div>
-        </div>
-
-        <div id="matriculeList" class="space-y-3 overflow-y-auto rounded-[32px] border border-slate-800 bg-slate-900/95 p-3 shadow-xl shadow-slate-950/40" style="max-height:calc(100vh - 240px);">
-            <div class="rounded-3xl border border-dashed border-slate-700 bg-slate-950/80 px-4 py-6 text-center text-sm text-slate-500">Chargement...</div>
-        </div>
-        <div id="pagination" class="flex flex-wrap items-center justify-center gap-2 rounded-[32px] border border-slate-800 bg-slate-900/95 p-4 text-sm text-slate-300"></div>
-    </aside>
-
-    <section class="space-y-6">
-        <div class="rounded-[32px] border border-slate-800 bg-slate-900/95 p-6 shadow-xl shadow-slate-950/40">
-            <div id="placeholder" class="flex min-h-[360px] flex-col items-center justify-center gap-4 rounded-[32px] border-2 border-dashed border-slate-800 bg-slate-950/60 p-10 text-center text-slate-500">
-                <svg class="h-24 w-24 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                <p class="max-w-lg text-base leading-7">Sélectionnez un matricule pour afficher les sous-dossiers et explorer les images depuis votre archive.</p>
-            </div>
-
-            <div id="detailView" class="hidden space-y-6">
-                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Détails du matricule</p>
-                        <h2 id="detailTitle" class="mt-2 text-3xl font-semibold text-white"></h2>
-                    </div>
-                    <button id="btnBack" class="inline-flex items-center gap-2 rounded-3xl border border-slate-800 bg-slate-950/95 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800">← Retour</button>
-                </div>
-
-                <div id="sousdossierGrid" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
-
-                <div id="galerieSection" class="hidden rounded-[32px] border border-slate-800 bg-slate-950/95 p-5">
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Galerie</p>
-                            <h3 id="galerieTitle" class="mt-2 text-xl font-semibold text-white"></h3>
-                        </div>
-                        <button id="btnCloseGalerie" class="rounded-3xl border border-slate-800 bg-slate-900/95 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800">Fermer</button>
-                    </div>
-                    <div id="galerieGrid" class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"></div>
-                </div>
+<main id="mainContainer" class="mx-auto max-w-6xl px-4 py-12 transition-all duration-500 ease-in-out">
+    
+    <!-- Barre de Recherche Stylisée (Dark/Light) -->
+    <section id="searchSection" class="mb-12">
+        <div class="rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/5 p-3 shadow-xl transition-all duration-300">
+            <div class="relative">
+                <i class="fas fa-search absolute left-8 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 text-xl"></i>
+                <input id="searchInput" type="search" placeholder="Rechercher un dossier matricule..."
+                       class="w-full rounded-2xl border-none bg-transparent py-5 pl-16 pr-8 text-lg font-black text-slate-900 dark:text-white outline-none placeholder:text-slate-400 dark:placeholder:text-slate-600 tracking-tight">
+                <div id="totalBadge" class="absolute right-6 top-1/2 -translate-y-1/2 rounded-xl bg-slate-100 dark:bg-slate-900 px-4 py-2 text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-400/20 shadow-inner">0 Items</div>
             </div>
         </div>
     </section>
+
+    <!-- Layout Master-Detail -->
+    <div id="layoutWrapper" class="flex flex-col gap-12 transition-all duration-500">
+        
+        <!-- Colonne GAUCHE : Répertoire -->
+        <aside id="sidebarList" class="w-full transition-all duration-500 ease-in-out">
+            <div class="flex items-center justify-between mb-8 px-6">
+                <div>
+                    <h2 class="text-[14px] font-black uppercase tracking-[0.5em] text-slate-900 dark:text-white">Répertoire</h2>
+                    <p class="text-[9px] font-bold text-slate-400 dark:text-slate-500 mt-1 uppercase tracking-widest">Base de données archivée</p>
+                </div>
+                <button id="btnRefresh" class="h-12 w-12 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/5 text-slate-400 hover:text-indigo-600 transition shadow-lg">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+            
+            <div id="matriculeList" class="flex flex-col gap-4 overflow-y-auto max-h-[70vh] px-4 custom-scrollbar">
+                <!-- Rempli par JS -->
+                <div class="py-20 text-center">
+                    <i class="fas fa-circle-notch animate-spin text-indigo-600 text-3xl mb-4"></i>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Chargement du répertoire...</p>
+                </div>
+            </div>
+
+            <div id="pagination" class="mt-12 flex justify-center gap-2"></div>
+        </aside>
+
+        <!-- Colonne DROITE : Détails -->
+        <section id="detailView" class="hidden flex-1 animate-in fade-in slide-in-from-right-12 duration-700">
+            <div class="sticky top-28 space-y-10">
+                <!-- En-tête -->
+                <div class="rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/5 p-10 shadow-2xl">
+                    <div class="flex items-center justify-between mb-8">
+                        <button id="btnBack" class="group flex items-center gap-3 rounded-xl bg-slate-900 px-6 py-3 text-[10px] font-black uppercase text-white hover:bg-indigo-600 transition shadow-2xl">
+                            <i class="fas fa-arrow-left transition group-hover:-translate-x-1"></i> Retour Liste
+                        </button>
+                        <div class="flex gap-2">
+                            <div class="h-1.5 w-1.5 rounded-full bg-slate-300 dark:bg-slate-600"></div>
+                            <div class="h-1.5 w-1.5 rounded-full bg-slate-300 dark:bg-slate-600"></div>
+                            <div class="h-1.5 w-1.5 rounded-full bg-indigo-500"></div>
+                        </div>
+                    </div>
+                    <h2 id="detailTitle" class="text-5xl font-black text-slate-900 dark:text-white tracking-tighter uppercase leading-none italic"></h2>
+                </div>
+
+                <!-- Grille des Sous-dossiers -->
+                <div id="sousdossierGrid" class="grid gap-3 grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"></div>
+
+                <!-- Galerie -->
+                <div id="galerieSection" class="hidden rounded-3xl bg-slate-900 dark:bg-black border border-white/5 p-8 shadow-2xl">
+                    <div class="mb-8 flex items-center justify-between border-b border-white/5 pb-6">
+                        <div>
+                            <h3 id="galerieTitle" class="text-xs font-black text-indigo-400 uppercase tracking-widest"></h3>
+                            <p class="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-widest italic uppercase">Visualisation</p>
+                        </div>
+                        <button id="btnCloseGalerie" class="h-10 w-10 rounded-full bg-slate-800 text-white hover:bg-red-500 transition border border-white/5">
+                            <i class="fas fa-times text-xs"></i>
+                        </button>
+                    </div>
+                    <div id="galerieGrid" class="grid gap-2 grid-cols-4 md:grid-cols-6 lg:grid-cols-8"></div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Placeholder -->
+    <div id="placeholder" class="hidden py-40 text-center">
+        <div class="inline-flex h-24 w-24 items-center justify-center rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/5 text-slate-200 dark:text-slate-700 mb-8 shadow-2xl">
+            <i class="fas fa-search text-4xl"></i>
+        </div>
+        <p class="text-xs font-black uppercase tracking-[0.4em] text-slate-400 dark:text-slate-500">Aucune archive correspondante</p>
+    </div>
+
+    <!-- Lightbox -->
+    <div id="lightbox" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 md:p-12 animate-in fade-in duration-300">
+        <div id="lightboxOverlay" class="absolute inset-0 bg-slate-950/95 backdrop-blur-xl"></div>
+        <div class="relative max-w-5xl w-full h-full flex flex-col items-center justify-center gap-8">
+            <button id="lightboxClose" class="absolute -top-12 right-0 h-12 w-12 rounded-2xl bg-white/10 text-white hover:bg-white/20 transition flex items-center justify-center group">
+                <i class="fas fa-times text-xl transition group-hover:rotate-90"></i>
+            </button>
+            <img id="lightboxImg" class="max-h-[80vh] w-auto rounded-3xl shadow-2xl border border-white/10 object-contain" src="" alt="">
+            <div id="lightboxCaption" class="text-center text-xs font-black uppercase tracking-[0.5em] text-indigo-400"></div>
+        </div>
+    </div>
 </main>
 
-<div id="lightbox" class="fixed inset-0 hidden items-center justify-center bg-slate-950/90 p-6">
-    <div id="lightboxOverlay" class="absolute inset-0"></div>
-    <div class="relative z-10 max-w-4xl overflow-hidden rounded-[32px] border border-slate-800 bg-slate-950 shadow-2xl">
-        <button id="lightboxClose" class="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-slate-900/95 text-sm font-semibold text-white transition hover:bg-slate-800">
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
-        <img id="lightboxImg" class="w-full max-h-[80vh] object-contain" src="" alt="">
-        <div id="lightboxCaption" class="border-t border-slate-800 bg-slate-900/95 px-6 py-4 text-sm text-slate-300"></div>
-    </div>
-</div>
+<style>
+    .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.02); }
+    .dark .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; }
+</style>
 
 <script src="public/js/app.js"></script>
 
