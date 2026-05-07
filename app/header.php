@@ -1,6 +1,7 @@
 <?php
 // app/header.php – Version Dark/Light avec Toggle
-session_start();
+require_once __DIR__ . '/auth.php';
+require_login();
 $baseHref = $baseHref ?? '';
 ?>
 <!DOCTYPE html>
@@ -44,7 +45,10 @@ $baseHref = $baseHref ?? '';
                     <i class="fas fa-database text-xl"></i>
                 </div>
                 <div>
-                    <h1 class="text-lg font-black uppercase tracking-widest leading-none text-slate-900 dark:text-white">GED <span class="text-indigo-600 dark:text-indigo-400">-MEF</span></h1>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-lg font-black uppercase tracking-widest leading-none text-slate-900 dark:text-white">GED <span class="text-indigo-600 dark:text-indigo-400">-MEF</span></h1>
+                        <div id="swooleStatusDot" class="h-2 w-2 rounded-full bg-slate-300 animate-pulse" title="Vérification du moteur temps réel..."></div>
+                    </div>
                     <p class="text-[9px] font-bold text-slate-400 dark:text-slate-500 mt-1 uppercase tracking-[0.3em]">Systeme nu</p>
                 </div>
             </a>
@@ -52,7 +56,10 @@ $baseHref = $baseHref ?? '';
             <!-- Navigation -->
             <nav class="hidden md:flex items-center gap-10 text-[11px] font-black uppercase tracking-[0.3em]">
                 <a href="<?= $baseHref ?>index.php" class="transition <?= ($currentPage ?? '') === 'index' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white' ?>">Répertoire</a>
-                <a href="<?= $baseHref ?>app/indexer.php" class="transition <?= ($currentPage ?? '') === 'indexer' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white' ?>">Indexation</a>
+                <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
+                    <a href="<?= $baseHref ?>app/indexer.php" class="transition <?= ($currentPage ?? '') === 'indexer' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white' ?>">Indexation</a>
+                    <a href="<?= $baseHref ?>app/server_status.php" class="transition <?= ($currentPage ?? '') === 'status' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white' ?>">État Serveur</a>
+                <?php endif; ?>
                 <?php if (!isset($_SESSION['username'])): ?>
                     <a href="<?= $baseHref ?>app/login.php" class="transition text-slate-500 hover:text-slate-900 dark:hover:text-white">Connexion</a>
                     <a href="<?= $baseHref ?>app/formulaire.php" class="transition text-slate-500 hover:text-slate-900 dark:hover:text-white">Inscription</a>

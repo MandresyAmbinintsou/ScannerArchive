@@ -3,14 +3,14 @@
         <div class="flex flex-col items-center text-center">
             <!-- Copyright -->
             <div class="mb-6 text-[11px] font-black uppercase tracking-[0.5em] text-slate-400 dark:text-slate-600">
-                &copy; <?php echo date('Y'); ?> - GED DIRECTION NUMÉRIQUE
+                &copy; <?php echo date('Y'); ?> - GED MEF
             </div>
 
             <!-- Description -->
             <div class="max-w-2xl text-[13px] font-bold leading-relaxed text-slate-600 dark:text-slate-400 uppercase tracking-tighter italic">
                 <p>
-                    Plateforme d'Archivage et Supervision de Documents. 
-                    Développement par <span class="text-indigo-600 dark:text-indigo-400 not-italic">Mandresy.A</span>.
+                    Plateforme d'Archivage et Supervision de Documents Intelligents. 
+                    Développé par <span class="text-indigo-600 dark:text-indigo-400 not-italic">Mandresy.A</span>.
                     Système Optimisé sur PostgreSQL.
                 </p>
             </div>

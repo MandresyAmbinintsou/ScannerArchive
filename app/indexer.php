@@ -1,10 +1,12 @@
 <?php
 // app/indexer.php — Version Grise Stylisée
 
+require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/scan.php';
 require_once __DIR__ . '/scan_go.php';
 
+check_admin();
 set_time_limit(0);
 $db = getDB();
 $history = getScanHistory($db, 20);
@@ -27,11 +29,16 @@ try {
         $engine = strtolower(trim((string)($_POST['engine'] ?? 'php')));
         $archiveRoot = validatePath($requestedRoot);
         if ($engine === 'go') {
-            $output = scanArchiveGo($db, $archiveRoot);
-            $message = 'Indexation terminée';
+            if (!isGoScannerAvailable()) {
+                $output = scanArchive($db, $archiveRoot);
+                $message = 'Scanner Go introuvable ou non exécutable ; fallback sur le moteur PHP.';
+            } else {
+                $output = scanArchiveGo($db, $archiveRoot);
+                $message = 'Indexation terminée avec le moteur Go.';
+            }
         } else {
             $output = scanArchive($db, $archiveRoot);
-            $message = 'Indexation terminée';
+            $message = 'Indexation terminée avec le moteur PHP.';
         }
         $messageType = 'success';
         $history = getScanHistory($db, 20);

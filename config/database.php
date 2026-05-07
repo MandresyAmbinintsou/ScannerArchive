@@ -9,7 +9,12 @@ define('DB_NAME', getenv('DB_NAME') ?: 'archive_db');
 
 $defaultDbUser = getenv('DB_USER') ?: getenv('PGUSER');
 if ($defaultDbUser === false || $defaultDbUser === '') {
-    $defaultDbUser = getenv('USER') ?: getenv('LOGNAME') ?: get_current_user();
+    // Under Windows, the environment username often does not match a PostgreSQL role.
+    if (PHP_OS_FAMILY === 'Windows') {
+        $defaultDbUser = 'postgres';
+    } else {
+        $defaultDbUser = getenv('USER') ?: getenv('LOGNAME') ?: get_current_user();
+    }
 }
 define('DB_USER', $defaultDbUser ?: 'postgres');
 
@@ -43,8 +48,15 @@ function getDB(): PDO {
                 PDO::ATTR_PERSISTENT         => true,
             ]);
         } catch (PDOException $e) {
-            // Code 08006 ou message "does not exist" = Base manquante
-            if (strpos($e->getMessage(), 'does not exist') !== false || $e->getCode() == '08006') {
+            // Detect missing database across translated PG messages and SQLSTATE codes.
+            $pdoSqlState = $e->errorInfo[0] ?? $e->getCode();
+            $message = $e->getMessage();
+            $isMissingDb = $pdoSqlState === '3D000'
+                || $pdoSqlState === '08006'
+                || stripos($message, 'does not exist') !== false
+                || stripos($message, 'existe pas') !== false;
+
+            if ($isMissingDb) {
                 try {
                     // 2. Se connecter à la base système 'postgres' pour créer 'archive_db'
                     $tempPdo = new PDO($dsnSystem, DB_USER, DB_PASS, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);

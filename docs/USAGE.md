@@ -30,10 +30,17 @@ export DB_USER=postgres
 export DB_PASS=""
 ```
 
+> Sous Windows, définissez explicitement `DB_USER=postgres` si votre compte système n'existe pas comme rôle PostgreSQL.
+
 Schéma:
 ```bash
 psql -U postgres -d archive_db -f scripts/schema.pg.sql
 ```
+
+> Si la base `archive_db` n'existe pas encore et que l'auto-création échoue, créez-la manuellement :
+> ```bash
+> psql -U postgres -c "CREATE DATABASE archive_db"
+> ```
 
 ## 3) Dossier racine de l’archive
 

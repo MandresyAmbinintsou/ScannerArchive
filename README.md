@@ -23,12 +23,22 @@ Deux moteurs d’indexation existent:
 │   ├── images.php            API (images d’un sous-dossier)
 │   └── image.php             Sert une image depuis le disque
 ├── cmd/scannerfs/            Scanner Go filesystem-only (JSONL)
-├── bin/scannerfs             Binaire local (Linux ici)
+├── bin/scannerfs             Binaire local Linux
+├── bin/scannerfs.exe         Binaire local Windows
 ├── scripts/
 │   ├── schema.pg.sql         Schéma PostgreSQL
 │   └── build_scannerfs.sh    Build multi-plateforme du binaire
 └── docker-compose.yml        PostgreSQL (mode trust) optionnel
 ```
+
+## Support Windows et portabilité
+
+- Le scanner Go peut être utilisé en mode Windows à partir de `bin/scannerfs.exe`.
+- Le projet est conçu pour tourner avec PostgreSQL sans mot de passe quand la base est configurée en mode trust/local.
+- Si le scanner Go n’est pas trouvé ou s’il n’est pas exécutable, le système retourne automatiquement au scanner PHP.
+- Pour recréer le binaire Windows, exécutez `scripts/build_scannerfs.sh` sur une machine où Go est installé.
+
+Voir `docs/mode_emploi.md` pour la configuration complète et les conseils de déploiement cross-plateforme.
 
 ## Installation rapide
 

@@ -8,15 +8,38 @@ require_once __DIR__ . '/scan.php';
 
 function goScannerPath(): string {
     $env = getenv('GO_SCANNERFS_PATH');
-    if ($env && is_string($env) && trim($env) !== '') return trim($env);
+    if ($env && is_string($env) && trim($env) !== '') {
+        return trim($env);
+    }
 
-    $win = realpath(__DIR__ . '/../bin/scannerfs.exe');
-    if ($win !== false) return $win;
+    $paths = [
+        __DIR__ . '/../bin/scannerfs.exe',
+        __DIR__ . '/../bin/scannerfs',
+        __DIR__ . '/../scannerfs.exe',
+        __DIR__ . '/../scannerfs',
+    ];
 
-    $default = realpath(__DIR__ . '/../bin/scannerfs');
-    if ($default !== false) return $default;
+    if (PHP_OS_FAMILY !== 'Windows') {
+        $paths = [
+            __DIR__ . '/../bin/scannerfs',
+            __DIR__ . '/../scannerfs',
+            __DIR__ . '/../bin/scannerfs.exe',
+            __DIR__ . '/../scannerfs.exe',
+        ];
+    }
+
+    foreach ($paths as $path) {
+        if (is_file($path)) {
+            return $path;
+        }
+    }
 
     return __DIR__ . '/../bin/scannerfs';
+}
+
+function isGoScannerAvailable(): bool {
+    $scanner = goScannerPath();
+    return is_file($scanner) && is_executable($scanner);
 }
 
 function scanArchiveGo(PDO $db, string $archiveRoot, ?string $scannerPath = null): string {

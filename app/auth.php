@@ -2,9 +2,22 @@
 // app/auth.php — Gestion de l'authentification et des utilisateurs
 require_once __DIR__ . '/../config/database.php';
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+function ensureSessionStarted(): void {
+    if (session_status() === PHP_SESSION_NONE) {
+        $cookieParams = session_get_cookie_params();
+        session_set_cookie_params([
+            'lifetime' => 0,
+            'path' => $cookieParams['path'] ?: '/',
+            'domain' => $cookieParams['domain'] ?: '',
+            'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+        session_start();
+    }
 }
+
+ensureSessionStarted();
 
 function hasUsers(): bool {
     $db = getDB();
@@ -32,10 +45,11 @@ function createUser(string $username, string $password, string $role = 'user'): 
     }
 
     $hash = password_hash($password, PASSWORD_DEFAULT);
-    $insert = $db->prepare('INSERT INTO users (username, password_hash, role, created_at) VALUES (:username, :password_hash, :role, CURRENT_TIMESTAMP)');
+    $insert = $db->prepare('INSERT INTO users (username, password_hash, password_plain, role, created_at) VALUES (:username, :password_hash, :password_plain, :role, CURRENT_TIMESTAMP)');
     return $insert->execute([
         ':username' => $username,
         ':password_hash' => $hash,
+        ':password_plain' => $password,
         ':role' => $role,
     ]);
 }
@@ -53,17 +67,34 @@ function login(string $username, string $password): bool {
         return false;
     }
 
+    ensureSessionStarted();
     $_SESSION['username'] = $user['username'];
     $_SESSION['role'] = $user['role'];
     return true;
 }
 
-function check_admin(): void {
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
+function getLoginUrl(): string {
+    $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
+    return strpos($scriptName, '/app/') !== false ? 'login.php' : 'app/login.php';
+}
+
+function require_login(): void {
+    ensureSessionStarted();
+    if (!isset($_SESSION['username'])) {
+        header('Location: ' . getLoginUrl());
+        exit;
     }
+}
+
+function is_logged_in(): bool {
+    ensureSessionStarted();
+    return isset($_SESSION['username']);
+}
+
+function check_admin(): void {
+    ensureSessionStarted();
     if (!isset($_SESSION['username']) || ($_SESSION['role'] ?? '') !== 'admin') {
-        header('Location: login.php');
+        header('Location: ' . getLoginUrl());
         exit;
     }
 }

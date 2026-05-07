@@ -40,14 +40,7 @@ try {
         $stmt->bindValue(3, $offset, PDO::PARAM_INT);
         $stmt->execute();
     } else {
-        // Cachez le count total
-        $cacheFile = sys_get_temp_dir() . '/matricules_total.cache';
-        if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < 300) {
-            $total = (int)file_get_contents($cacheFile);
-        } else {
-            $total = (int)$db->query('SELECT COUNT(*) FROM matricules')->fetchColumn();
-            file_put_contents($cacheFile, $total);
-        }
+        $total = (int)$db->query('SELECT COUNT(*) FROM matricules')->fetchColumn();
 
         $stmt = $db->prepare('SELECT id, nom, nb_sousdossiers FROM matricules ORDER BY nom LIMIT ? OFFSET ?');
         $stmt->bindValue(1, $limit, PDO::PARAM_INT);

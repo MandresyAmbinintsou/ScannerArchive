@@ -22,7 +22,7 @@ require_once 'app/header.php';
     <div id="layoutWrapper" class="flex flex-col gap-12 transition-all duration-500">
         
         <!-- Colonne GAUCHE : Répertoire -->
-        <aside id="sidebarList" class="w-full transition-all duration-500 ease-in-out">
+        <aside id="sidebarList" class="w-full max-w-3xl mx-auto transition-all duration-500 ease-in-out">
             <div class="flex items-center justify-between mb-8 px-6">
                 <div>
                     <h2 class="text-[14px] font-black uppercase tracking-[0.5em] text-slate-900 dark:text-white">Répertoire</h2>
@@ -33,7 +33,7 @@ require_once 'app/header.php';
                 </button>
             </div>
             
-            <div id="matriculeList" class="flex flex-col gap-4 overflow-y-auto max-h-[70vh] px-4 custom-scrollbar">
+            <div id="matriculeList" class="flex flex-col gap-4 px-6">
                 <!-- Rempli par JS -->
                 <div class="py-20 text-center">
                     <i class="fas fa-circle-notch animate-spin text-indigo-600 text-3xl mb-4"></i>
@@ -94,22 +94,19 @@ require_once 'app/header.php';
     <div id="lightbox" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 md:p-12 animate-in fade-in duration-300">
         <div id="lightboxOverlay" class="absolute inset-0 bg-slate-950/95 backdrop-blur-xl"></div>
         <div class="relative max-w-5xl w-full h-full flex flex-col items-center justify-center gap-8">
-            <button id="lightboxClose" class="absolute -top-12 right-0 h-12 w-12 rounded-2xl bg-white/10 text-white hover:bg-white/20 transition flex items-center justify-center group">
-                <i class="fas fa-times text-xl transition group-hover:rotate-90"></i>
-            </button>
+            <div class="flex gap-4">
+                <a id="lightboxPrint" href="#" target="_blank" class="h-12 px-6 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 transition flex items-center justify-center gap-3 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20">
+                    <i class="fas fa-file-pdf text-lg"></i> Imprimer PDF
+                </a>
+                <button id="lightboxClose" class="h-12 w-12 rounded-2xl bg-white/10 text-white hover:bg-white/20 transition flex items-center justify-center group">
+                    <i class="fas fa-times text-xl transition group-hover:rotate-90"></i>
+                </button>
+            </div>
             <img id="lightboxImg" class="max-h-[80vh] w-auto rounded-3xl shadow-2xl border border-white/10 object-contain" src="" alt="">
             <div id="lightboxCaption" class="text-center text-xs font-black uppercase tracking-[0.5em] text-indigo-400"></div>
         </div>
     </div>
 </main>
-
-<style>
-    .custom-scrollbar::-webkit-scrollbar { width: 5px; }
-    .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.02); }
-    .dark .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-    .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; }
-</style>
 
 <script src="public/js/app.js"></script>
 

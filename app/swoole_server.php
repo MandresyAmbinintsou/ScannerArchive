@@ -88,24 +88,36 @@ $server->on('Request', function (Request $request, Response $response) {
 $server->on('Task', function (Server $server, $task_id, $from_id, $data) {
     $fd = $data['fd'] ?? null;
     $archiveRoot = $data['root'];
+    $shouldBroadcast = $data['broadcast'] ?? false;
     $db = getDB();
     
-    if ($fd && $server->exist($fd)) {
-        $server->push($fd, json_encode(['type' => 'progress', 'percent' => 10, 'message' => 'Lecture du dossier racine...']));
+    $msg = ['type' => 'progress', 'percent' => 10, 'message' => 'Lecture du dossier racine...'];
+    if ($shouldBroadcast) {
+        broadcast($server, $msg);
+    } elseif ($fd && $server->exist($fd)) {
+        $server->push($fd, json_encode($msg));
     }
 
     try {
         $summary = scanArchive($db, $archiveRoot); 
-        if ($fd && $server->exist($fd)) {
-            $server->push($fd, json_encode([
-                'type' => 'finish',
-                'message' => 'Indexation terminée',
-                'summary' => $summary
-            ]));
+        
+        $finishMsg = [
+            'type' => 'finish',
+            'message' => 'Indexation terminée',
+            'summary' => $summary
+        ];
+        
+        if ($shouldBroadcast) {
+            broadcast($server, $finishMsg);
+        } elseif ($fd && $server->exist($fd)) {
+            $server->push($fd, json_encode($finishMsg));
         }
     } catch (Exception $e) {
-        if ($fd && $server->exist($fd)) {
-            $server->push($fd, json_encode(['type' => 'error', 'message' => $e->getMessage()]));
+        $errorMsg = ['type' => 'error', 'message' => $e->getMessage()];
+        if ($shouldBroadcast) {
+            broadcast($server, $errorMsg);
+        } elseif ($fd && $server->exist($fd)) {
+            $server->push($fd, json_encode($errorMsg));
         }
     }
 });
@@ -116,3 +128,4 @@ $server->on('Finish', function (Server $server, $task_id, $data) {
 
 echo "Serveur démarré sur http://localhost:8000\n";
 $server->start();
+art();

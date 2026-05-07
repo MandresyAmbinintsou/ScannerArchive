@@ -18,6 +18,7 @@ const state = {
     currentMatricule: null,
     isLoading: false,
     isSplitView: false,
+    hasMore: true,
 };
 
 const els = {
@@ -43,7 +44,119 @@ const els = {
     lightboxImg:    document.getElementById('lightboxImg'),
     lightboxCaption:document.getElementById('lightboxCaption'),
     lightboxClose:  document.getElementById('lightboxClose'),
+    lightboxPrint:  document.getElementById('lightboxPrint'),
+    notificationToast: null,
 };
+
+/**
+ * Système de Notification (Toast)
+ */
+function showToast(message, type = 'info') {
+    if (!els.notificationToast) {
+        const container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'fixed bottom-8 right-8 z-[200] flex flex-col gap-3';
+        document.body.appendChild(container);
+        els.notificationToast = container;
+    }
+
+    const toast = document.createElement('div');
+    const colors = {
+        success: 'bg-emerald-500',
+        error: 'bg-red-500',
+        info: 'bg-indigo-600',
+        progress: 'bg-slate-800'
+    };
+
+    toast.className = `${colors[type]} text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-right-full duration-500 border border-white/10`;
+    toast.innerHTML = `
+        <div class="flex-1">
+            <p class="text-[10px] font-black uppercase tracking-widest">${message}</p>
+        </div>
+        <button class="text-white/50 hover:text-white transition"><i class="fas fa-times"></i></button>
+    `;
+
+    els.notificationToast.appendChild(toast);
+    
+    const close = () => {
+        toast.classList.replace('animate-in', 'animate-out');
+        toast.classList.add('fade-out', 'slide-out-to-right-full');
+        setTimeout(() => toast.remove(), 500);
+    };
+
+    toast.querySelector('button').onclick = close;
+    if (type !== 'progress') setTimeout(close, 5000);
+    return toast;
+}
+
+/**
+ * WebSocket pour le temps réel
+ */
+let socket = null;
+function initSocket() {
+    const dot = document.getElementById('swooleStatusDot');
+    try {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.hostname;
+        socket = new WebSocket(`${protocol}//${host}:8000`);
+
+        socket.onopen = () => {
+            if (dot) {
+                dot.classList.replace('bg-slate-300', 'bg-emerald-500');
+                dot.classList.remove('animate-pulse');
+                dot.title = "Moteur temps réel connecté";
+            }
+        };
+
+        socket.onmessage = (event) => {
+            const data = json_decode_safe(event.data);
+            if (!data) return;
+
+            switch (data.type) {
+                case 'status':
+                    showToast(data.message, 'info');
+                    break;
+                case 'progress':
+                    showToast(`Scan : ${data.message}`, 'progress');
+                    break;
+                case 'finish':
+                    showToast("Répertoire mis à jour avec succès !", 'success');
+                    if (!state.isSplitView) {
+                        loadMatricules();
+                    } else {
+                        showToast("De nouveaux dossiers sont peut-être disponibles.", 'info');
+                    }
+                    break;
+                case 'error':
+                    showToast(data.message, 'error');
+                    break;
+            }
+        };
+
+        socket.onclose = () => {
+            if (dot) {
+                dot.classList.add('bg-slate-300', 'animate-pulse');
+                dot.classList.remove('bg-emerald-500');
+                dot.title = "Moteur temps réel déconnecté (reconnexion...)";
+            }
+            setTimeout(initSocket, 5000); 
+        };
+
+        socket.onerror = () => {
+            if (dot) {
+                dot.classList.add('bg-red-500');
+                dot.classList.remove('bg-emerald-500', 'bg-slate-300', 'animate-pulse');
+                dot.title = "Erreur de connexion au moteur temps réel";
+            }
+        };
+    } catch (e) {
+        console.warn("WebSocket non disponible");
+    }
+}
+
+function json_decode_safe(str) {
+    try { return JSON.parse(str); } catch(e) { return null; }
+}
 
 /**
  * Helper Fetch
@@ -68,9 +181,19 @@ async function refreshArchive() {
 /**
  * Chargement du répertoire
  */
-async function loadMatricules() {
+async function loadMatricules(append = false) {
     if (state.isLoading) return;
     state.isLoading = true;
+
+    if (!append) {
+        state.page = 1;
+        els.matriculeList.innerHTML = `
+            <div class="py-20 text-center">
+                <i class="fas fa-circle-notch animate-spin text-indigo-600 text-3xl mb-4"></i>
+                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Chargement...</p>
+            </div>
+        `;
+    }
 
     try {
         const data = await apiFetch(API.matricules, {
@@ -80,10 +203,11 @@ async function loadMatricules() {
         });
 
         const { data: rows, pagination } = data;
+        state.hasMore = state.page < pagination.totalPages;
         
         if (els.totalBadge) els.totalBadge.textContent = `${pagination.total} Items`;
 
-        if (rows.length === 0) {
+        if (rows.length === 0 && !append) {
             els.sidebarList.classList.add('hidden');
             els.placeholder.classList.remove('hidden');
             return;
@@ -92,13 +216,12 @@ async function loadMatricules() {
         els.sidebarList.classList.remove('hidden');
         els.placeholder.classList.add('hidden');
 
-        // Rendu des Matricules (Agrandis & Stylisés)
-        els.matriculeList.innerHTML = rows.map(m => `
+        const html = rows.map(m => `
             <div class="matricule-row group flex items-center justify-between rounded-[1.8rem] border-2 border-transparent bg-white dark:bg-slate-800 p-7 transition-all duration-300 hover:border-indigo-500 hover:shadow-2xl cursor-pointer ${state.currentMatricule?.id === m.id ? 'border-indigo-600 bg-indigo-50/50 dark:bg-slate-900 shadow-inner' : ''}"
                  data-id="${m.id}" data-nom="${escapeHtml(m.nom)}">
                 <div class="flex items-center gap-6 overflow-hidden">
                     <div class="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl ${state.currentMatricule?.id === m.id ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-100 dark:bg-slate-900 text-slate-400 dark:text-slate-600 group-hover:bg-indigo-500 group-hover:text-white'} transition-all duration-300 font-black text-xl">
-                        <i class="fas fa-folder-tree"></i>
+                        <i class="fas fa-user-circle"></i>
                     </div>
                     <div class="truncate">
                         <div class="text-[20px] font-black text-slate-900 dark:text-white uppercase tracking-tight truncate">${escapeHtml(m.nom)}</div>
@@ -112,14 +235,41 @@ async function loadMatricules() {
             </div>
         `).join('');
 
-        renderPagination(pagination);
+        if (append) {
+            els.matriculeList.insertAdjacentHTML('beforeend', html);
+        } else {
+            els.matriculeList.innerHTML = html;
+        }
+
+        renderLoadMore();
         attachMatriculeEvents();
 
     } catch (err) {
         console.error('Erreur API:', err);
-        els.matriculeList.innerHTML = `<div class="py-20 text-center text-red-500 font-black uppercase text-[10px] tracking-widest italic">Erreur Système : Accès Base Refusé</div>`;
+        if (!append) els.matriculeList.innerHTML = `<div class="py-20 text-center text-red-500 font-black uppercase text-[10px] tracking-widest italic">Erreur Système</div>`;
     } finally {
         state.isLoading = false;
+    }
+}
+
+function renderLoadMore() {
+    if (state.hasMore) {
+        els.pagination.innerHTML = `
+            <button id="btnLoadMore" class="group flex items-center gap-4 rounded-2xl bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-white/5 px-10 py-5 text-[11px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:border-indigo-600 hover:text-indigo-600 transition shadow-lg mx-auto block mt-8">
+                <span>Voir plus de matricules</span>
+                <i class="fas fa-plus transition group-hover:rotate-90"></i>
+            </button>
+        `;
+        document.getElementById('btnLoadMore').addEventListener('click', () => {
+            state.page++;
+            loadMatricules(true);
+        });
+    } else {
+        els.pagination.innerHTML = state.page > 1 ? `
+            <div class="text-center mt-8">
+                <p class="text-[9px] font-black uppercase tracking-[0.4em] text-slate-400 dark:text-slate-500 italic">Fin du répertoire</p>
+            </div>
+        ` : '';
     }
 }
 
@@ -133,34 +283,15 @@ function attachMatriculeEvents() {
     });
 }
 
-function renderPagination({ page, totalPages }) {
-    if (totalPages <= 1) { els.pagination.innerHTML = ''; return; }
-    
-    let html = '';
-    const range = 1;
-    for (let i = 1; i <= totalPages; i++) {
-        if (i === 1 || i === totalPages || (i >= page - range && i <= page + range)) {
-            html += `<button type="button" class="page-btn inline-flex h-11 w-11 items-center justify-center rounded-xl text-[11px] font-black transition-all duration-300 ${i === page ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/5 text-slate-500 hover:border-indigo-600 hover:text-indigo-600 dark:hover:text-white'}" data-page="${i}">${i}</button>`;
-        } else if (i === page - range - 1 || i === page + range + 1) {
-            html += `<span class="px-2 text-slate-400 text-xs">...</span>`;
-        }
-    }
-    els.pagination.innerHTML = html;
-    els.pagination.querySelectorAll('.page-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            state.page = parseInt(btn.dataset.page);
-            loadMatricules();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        });
-    });
-}
-
 /**
  * Sélection d'un matricule
  */
 async function selectMatricule(id, nom) {
     if (state.currentMatricule?.id === id) return;
+    
+    // Remonter en haut pour voir le contenu (Meilleure UX)
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
     state.currentMatricule = { id, nom };
     state.isSplitView = true;
     
@@ -169,7 +300,7 @@ async function selectMatricule(id, nom) {
     els.layoutWrapper.classList.replace('flex-col', 'md:flex-row');
     els.layoutWrapper.classList.add('items-start');
     
-    els.sidebarList.classList.remove('w-full');
+    els.sidebarList.classList.remove('w-full', 'max-w-3xl', 'mx-auto');
     els.sidebarList.classList.add('md:w-[450px]', 'shrink-0');
     
     // Affichage immédiat du loader dans la vue détail
@@ -260,6 +391,9 @@ async function loadGalerie(sousDossierId, nom) {
 function openLightbox(url, nom) {
     els.lightboxImg.src = url;
     els.lightboxCaption.textContent = nom;
+    if (els.lightboxPrint) {
+        els.lightboxPrint.href = `${BASE}app/print_pdf.php?url=${encodeURIComponent(url)}`;
+    }
     els.lightbox.classList.remove('hidden');
     els.lightbox.classList.add('flex');
     document.body.style.overflow = 'hidden';
@@ -272,7 +406,7 @@ function closeLightbox() {
 }
 
 // RETOUR : Reset layout
-els.btnBack.addEventListener('click', () => {
+els.btnBack?.addEventListener('click', () => {
     state.currentMatricule = null;
     state.isSplitView = false;
     
@@ -282,13 +416,11 @@ els.btnBack.addEventListener('click', () => {
     els.layoutWrapper.classList.remove('items-start');
     
     els.sidebarList.classList.remove('md:w-[450px]', 'shrink-0');
-    els.sidebarList.classList.add('w-full');
+    els.sidebarList.classList.add('w-full', 'max-w-3xl', 'mx-auto');
     
     els.matriculeList.querySelectorAll('.matricule-row').forEach(r => r.classList.remove('border-indigo-600', 'bg-indigo-50/50', 'dark:bg-slate-900', 'shadow-inner'));
     window.scrollTo({ top: 0, behavior: 'smooth' });
 });
-
-// Supprimé : L'effet de survol qui masquait la vue détail car il nuisait à l'expérience "côte à côte"
 
 els.btnCloseGalerie?.addEventListener('click', () => {
     els.galerieSection.classList.add('hidden');
@@ -319,10 +451,7 @@ els.btnRefresh?.addEventListener('click', async () => {
  */
 window.addEventListener('DOMContentLoaded', () => {
     loadMatricules();
-    // Le refresh automatique au chargement est désactivé car il vide la DB à chaque F5
-    // refreshArchive().then(res => {
-    //     if (res && res.ok) loadMatricules();
-    // });
+    initSocket();
 });
 
 function escapeHtml(str) {
