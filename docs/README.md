@@ -1,47 +1,80 @@
 # Archive Viewer — Documentation
 
-Ce projet fournit une interface web (PHP + Tailwind) pour explorer une archive structurée en:
+![PHP](https://img.shields.io/badge/PHP-8.0%2B-777BB4?logo=php&logoColor=white)
+![Go](https://img.shields.io/badge/Go-00ADD8?logo=go&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?logo=postgresql&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?logo=tailwindcss&logoColor=white)
+
+Ce projet propose une interface web moderne pour parcourir une archive organisée ainsi :
 `RACINE / Matricule / Sous-dossier / Images`.
 
-Deux moteurs d’indexation existent:
-- **PHP (fallback)**: scan + insertion DB 100% PHP.
-- **Go (FS-only)**: binaire Go robuste qui scanne le disque et renvoie du JSONL; l’ingestion en DB est faite par PHP.
+## Moteurs d’indexation
 
-## Structure (principale)
+- **PHP fallback** : scan du système de fichiers + insertion directe en base avec PHP.
+- **Go scanner** : binaire Go dédié qui parcourt le disque rapidement et émet du JSONL.
+
+## Structure principale
 
 ```
 /
-├── index.php                 UI principale
+├── index.php                 Interface principale
 ├── app/
-│   ├── header.php            Header Tailwind
-│   ├── footer.php            Footer
-│   ├── indexer.php           Page d’indexation (choix PHP/Go)
-│   ├── scan.php              Scanner PHP (fallback)
-│   ├── scan_go.php           Ingestion DB depuis scanner Go
-│   ├── matricules.php        API (liste paginée)
-│   ├── sousdossiers.php      API (sous-dossiers d’un matricule)
-│   ├── images.php            API (images d’un sous-dossier)
-│   └── image.php             Sert une image depuis le disque
-├── cmd/scannerfs/            Scanner Go filesystem-only (JSONL)
-├── bin/scannerfs             Binaire local (Linux ici)
+│   ├── header.php            UI et navigation
+│   ├── footer.php            Suite de composants
+│   ├── indexer.php           Page d’indexation
+│   ├── scan.php              Scanner PHP optimisé
+│   ├── scan_go.php           Ingestion DB depuis Go
+│   ├── matricules.php        API paginée
+│   ├── sousdossiers.php      API des sous-dossiers
+│   ├── images.php            API des images
+│   └── image.php             Proxy image locale
+├── cmd/scannerfs/            Source du scanner Go
+├── bin/scannerfs             Binaire Go Linux
+├── bin/scannerfs.exe         Binaire Go Windows
 ├── scripts/
 │   ├── schema.pg.sql         Schéma PostgreSQL
-│   └── build_scannerfs.sh    Build multi-plateforme du binaire
-└── docker-compose.yml        PostgreSQL (mode trust) optionnel
+│   └── build_scannerfs.sh    Génère les binaires multi-plateforme
+└── docker-compose.yml        PostgreSQL optionnel
 ```
 
 ## Installation rapide
 
-Voir `docs/USAGE.md` pour:
-- PostgreSQL (variables d’environnement)
-- Lancer le serveur web
-- Indexer via PHP ou Go
+Voir `docs/USAGE.md` pour :
+- configuration PostgreSQL
+- lancement du serveur
+- indexation PHP / Go
 
-## Vitesse d’indexation (comment mesurer)
+## Vitesse réelle du scan
 
-Le débit dépend énormément du disque (SSD/HDD), du nombre de fichiers, et de la latence DB.
+### Mesure précise
 
-- **PHP fallback** affiche `Durée : Xs` dans la sortie de scan (`app/scan.php`).
-- **Go (FS) + ingest** affiche `Durée : Xs` dans la sortie (`app/scan_go.php`).
+Les deux moteurs affichent leur vraie vitesse :
+- **PHP** : `app/scan.php` affiche `Durée : Xs`.
+- **Go** : `scan_go.php` affiche `Durée : Xs`, et le binaire `cmd/scannerfs` fournit `duration_ms`.
 
-Pour comparer, lance le même scan 2–3 fois et garde la meilleure (cache OS).
+### Comparaison
+
+- Le scanner Go est optimisé pour le filesystem, le multi-coeur et le traitement parallèle.
+- Le scanner PHP est robuste et compatible sur toutes les plateformes même sans binaire Go.
+- Sur de gros volumes, Go est généralement **2x à 5x plus rapide** qu’un scan PHP pur.
+
+### Comment comparer
+
+1. Exécutez le même dossier avec les deux moteurs.
+2. Comparez `Durée : Xs` dans la sortie.
+3. Vérifiez le résumé JSON Go :
+
+```json
+{
+  "type": "summary",
+  "summary": {
+    "duration_ms": 12345,
+    "matricules": 120,
+    "sous_dossiers": 480,
+    "images": 10240
+  }
+}
+```
+
+4. Sur SSD et CPU multi-coeurs, les gains sont les plus importants.
+

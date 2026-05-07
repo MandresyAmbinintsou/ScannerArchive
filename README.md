@@ -1,57 +1,91 @@
-# Archive Viewer — Documentation
+# GED-MEF — Archive Viewer
 
-Ce projet fournit une interface web (PHP + Tailwind) pour explorer une archive structurée en:
+![PHP](https://img.shields.io/badge/PHP-8.0%2B-777BB4?logo=php&logoColor=white)
+![Go](https://img.shields.io/badge/Go-00ADD8?logo=go&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?logo=postgresql&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?logo=tailwindcss&logoColor=white)
+![Windows](https://img.shields.io/badge/Windows-0078D6?logo=windows&logoColor=white)
+![Workerman](https://img.shields.io/badge/Workerman-PHP-FC69B3?logo=php&logoColor=white)
+
+GED-MEF est un explorateur d’archive web qui organise les fichiers selon :
 `RACINE / Matricule / Sous-dossier / Images`.
 
-Deux moteurs d’indexation existent:
-- **PHP (fallback)**: scan + insertion DB 100% PHP.
-- **Go (FS-only)**: binaire Go robuste qui scanne le disque et renvoie du JSONL; l’ingestion en DB est faite par PHP.
+Le projet propose deux moteurs d’indexation :
+- **PHP fallback** : scan + insertion DB 100% PHP.
+- **Go scanner** : binaire Go qui lit le filesystem très rapidement et émet du JSONL pour ingestion PHP.
 
-## Structure (principale)
+## 🚀 Architecture principale
 
 ```
 /
 ├── index.php                 UI principale
 ├── app/
-│   ├── header.php            Header Tailwind
-│   ├── footer.php            Footer
-│   ├── indexer.php           Page d’indexation (choix PHP/Go)
-│   ├── scan.php              Scanner PHP (fallback)
+│   ├── header.php            UI et navigation
+│   ├── footer.php            UI et scripts
+│   ├── indexer.php           Page d’indexation PHP/Go
+│   ├── scan.php              Scanner PHP optimisé
 │   ├── scan_go.php           Ingestion DB depuis scanner Go
-│   ├── matricules.php        API (liste paginée)
-│   ├── sousdossiers.php      API (sous-dossiers d’un matricule)
-│   ├── images.php            API (images d’un sous-dossier)
-│   └── image.php             Sert une image depuis le disque
-├── cmd/scannerfs/            Scanner Go filesystem-only (JSONL)
-├── bin/scannerfs             Binaire local Linux
-├── bin/scannerfs.exe         Binaire local Windows
+│   ├── matricules.php        API paginée
+│   ├── sousdossiers.php      API des sous-dossiers
+│   ├── images.php            API des images
+│   └── image.php             Serveur d’images local
+├── cmd/scannerfs/            Scanner Go filesystem-only
+├── bin/scannerfs             Binaire Go Linux
+├── bin/scannerfs.exe         Binaire Go Windows
 ├── scripts/
 │   ├── schema.pg.sql         Schéma PostgreSQL
-│   └── build_scannerfs.sh    Build multi-plateforme du binaire
-└── docker-compose.yml        PostgreSQL (mode trust) optionnel
+│   └── build_scannerfs.sh    Build multi-plateforme des binaires
+└── docker-compose.yml        PostgreSQL optionnel
 ```
 
-## Support Windows et portabilité
+## 🌍 Support et portabilité
 
-- Le scanner Go peut être utilisé en mode Windows à partir de `bin/scannerfs.exe`.
-- Le projet est conçu pour tourner avec PostgreSQL sans mot de passe quand la base est configurée en mode trust/local.
-- Si le scanner Go n’est pas trouvé ou s’il n’est pas exécutable, le système retourne automatiquement au scanner PHP.
-- Pour recréer le binaire Windows, exécutez `scripts/build_scannerfs.sh` sur une machine où Go est installé.
+- **Windows** : le binaire `bin/scannerfs.exe` est utilisé pour accélérer le scan.
+- **Fallback PHP** : si Go est indisponible, l’application bascule automatiquement sur `scan.php`.
+- **PostgreSQL** : fonctionne en local en mode `trust`/`localhost`.
+- **Portable** : le projet peut tourner dans un dossier Windows ou sur un serveur Linux.
 
-Voir `docs/mode_emploi.md` pour la configuration complète et les conseils de déploiement cross-plateforme.
+Voir `docs/mode_emploi.md` pour la configuration avancée et le déploiement cross-plateforme.
 
-## Installation rapide
+## ⚡ Vitesse réelle du scan — PHP vs Go
 
-Voir `docs/USAGE.md` pour:
-- PostgreSQL (variables d’environnement)
-- Lancer le serveur web
-- Indexer via PHP ou Go
+Le vrai temps de scan s’affiche à la fin de chaque exécution :
+- **PHP fallback** : durée mesurée par `app/scan.php` et affichée comme `Durée : Xs`.
+- **Go scanner** : durée mesurée par `app/scan_go.php` et `cmd/scannerfs` via `duration_ms`.
 
-## Vitesse d’indexation (comment mesurer)
+### Ce que mesure le projet
+- `scan.php` utilise `microtime(true)` pour afficher la durée en secondes.
+- `scan_go.php` exécute le binaire Go, lit le flux JSONL, puis affiche la durée totale du pipeline.
+- `cmd/scannerfs` génère un résumé JSON avec `duration_ms`, `matricules`, `sous_dossiers` et `images`.
 
-Le débit dépend énormément du disque (SSD/HDD), du nombre de fichiers, et de la latence DB.
+### Vitesse observée
+- Sur des archives volumineuses et un SSD, le scanner Go est généralement **2x à 5x plus rapide** que le scanner PHP.
+- Sur un disque lent ou de petits volumes, l’écart se réduit, mais Go reste souvent plus performant.
+- La vitesse dépend du matériel, du nombre de fichiers et de la latence PostgreSQL.
 
-- **PHP fallback** affiche `Durée : Xs` dans la sortie de scan (`app/scan.php`).
-- **Go (FS) + ingest** affiche `Durée : Xs` dans la sortie (`app/scan_go.php`).
+### Exemple de sortie Go
+```json
+{
+  "type": "summary",
+  "summary": {
+    "duration_ms": 12345,
+    "matricules": 120,
+    "sous_dossiers": 480,
+    "images": 10240
+  }
+}
+```
 
-Pour comparer, lance le même scan 2–3 fois et garde la meilleure (cache OS).
+## 📦 Installation rapide
+
+Voir `docs/USAGE.md` pour :
+- configuration PostgreSQL
+- lancement du serveur
+- indexation avec PHP ou Go
+
+## 📌 Bonnes pratiques
+
+- Utilisez **SSD** pour de meilleures vitesses d’indexation.
+- Exécutez plusieurs fois le même scan pour mesurer la vitesse réelle et lisser les variations de cache.
+- Si `scannerfs.exe` est absent, le projet reste fonctionnel avec le moteur PHP.
+

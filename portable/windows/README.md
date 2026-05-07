@@ -1,20 +1,18 @@
 # Portable Windows (Option B)
 
-Objectif: lancer l’app depuis un zip **sans installation**, avec:
-- PostgreSQL portable
-- PHP portable
-- le projet (ce repo)
-- le scanner Go Windows `scannerfs.exe` (optionnel)
+![Windows](https://img.shields.io/badge/Windows-0078D6?logo=windows&logoColor=white)
+![PHP](https://img.shields.io/badge/PHP-8.0%2B-777BB4?logo=php&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?logo=postgresql&logoColor=white)
+![Go](https://img.shields.io/badge/Go-00ADD8?logo=go&logoColor=white)
 
-Limitations:
-- il faut quand même **inclure** les binaires PostgreSQL et PHP dans le zip (ou les déposer manuellement).
-- Windows a besoin du bon binaire Go (`scannerfs-windows-amd64.exe`).
+Objectif : lancer l’application sans installation complète, avec un paquet portable Windows.
 
-## Structure attendue
+## Contenu attendu
 
 ```
 portable/windows/
 ├── run.bat
+├── run_workerman.bat
 ├── env.example.bat
 ├── php/                 (ex: php-8.x-win)
 │   └── php.exe
@@ -22,7 +20,7 @@ portable/windows/
 │   ├── bin/pg_ctl.exe
 │   ├── bin/initdb.exe
 │   └── bin/psql.exe
-├── data/                (créé automatiquement: data PG)
+├── data/                (créé automatiquement)
 └── app/                 (copie du projet à la racine du zip)
     ├── index.php
     ├── app/...
@@ -30,15 +28,32 @@ portable/windows/
     └── bin/scannerfs.exe   (optionnel)
 ```
 
+## Principe
+
+- `run.bat` démarre le serveur PHP intégré.
+- `run_workerman.bat` démarre le serveur Workerman WebSocket + HTTP.
+- `bin/scannerfs.exe` accélère l’indexation en mode Go.
+
 ## Lancer
 
-1) Copie le contenu du projet dans `portable/windows/app/`
-2) Mets PHP portable dans `portable/windows/php/`
-3) Mets PostgreSQL portable dans `portable/windows/postgres/`
-4) (Optionnel) mets `scannerfs.exe` dans `portable/windows/app/bin/scannerfs.exe`
-5) Double-clique `portable/windows/run.bat`
+1) Copiez le projet dans `portable/windows/app/`
+2) Déposez PHP portable dans `portable/windows/php/`
+3) Déposez PostgreSQL portable dans `portable/windows/postgres/`
+4) Optionnel : placez `scannerfs.exe` dans `portable/windows/app/bin/scannerfs.exe`
 
-Puis ouvre:
-- `http://127.0.0.1:8000/index.php`
-- `http://127.0.0.1:8000/app/indexer.php`
+### Exécuter en mode portable
+
+- **Sans WebSocket** : double-cliquez `portable/windows/run.bat`
+- **Avec Workerman** : double-cliquez `portable/windows/run_workerman.bat`
+
+## Accès
+
+- Interface : `http://127.0.0.1:8000/index.php`
+- Indexation : `http://127.0.0.1:8000/app/indexer.php`
+
+## Vitesse de scan
+
+- Le moteur Go Windows est le plus rapide sur des archives volumineuses.
+- Le scan Go affiche la vraie durée dans `scan_go.php` et le binaire Go fournit `duration_ms`.
+- Si Go n’est pas disponible, le système bascule automatiquement sur le scanner PHP.
 
