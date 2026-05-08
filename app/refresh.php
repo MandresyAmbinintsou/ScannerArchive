@@ -22,6 +22,14 @@ try {
 
     $summary = scanArchive($db, $archiveRoot);
 
+    $notifyFile = __DIR__ . '/.notify.json';
+    $notification = [
+        'type' => 'finish',
+        'message' => 'Nouveaux matricules indexés',
+        'timestamp' => time(),
+    ];
+    @file_put_contents($notifyFile, json_encode($notification));
+
     echo json_encode([
         'ok'      => true,
         'root'    => $archiveRoot,

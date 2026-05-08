@@ -104,7 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <!-- Footer -->
         <p class="mt-10 text-center text-[9px] font-black uppercase tracking-[0.5em] text-slate-400 dark:text-slate-600">
-            &copy; <?php echo date('Y'); ?> - GED DIRECTION NUMÉRIQUE
+            &copy; <?php echo date('Y'); ?> - GED - MEF
         </p>
     </div>
 

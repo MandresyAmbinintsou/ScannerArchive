@@ -47,7 +47,7 @@ $baseHref = $baseHref ?? '';
                 <div>
                     <div class="flex items-center gap-2">
                         <h1 class="text-lg font-black uppercase tracking-widest leading-none text-slate-900 dark:text-white">GED <span class="text-indigo-600 dark:text-indigo-400">-MEF</span></h1>
-                        <div id="swooleStatusDot" class="h-2 w-2 rounded-full bg-slate-300 animate-pulse" title="Vérification du moteur temps réel..."></div>
+                        <div id="realtimeStatusDot" class="h-2 w-2 rounded-full bg-slate-300 animate-pulse" title="Vérification du moteur temps réel..."></div>
                     </div>
                     <p class="text-[9px] font-bold text-slate-400 dark:text-slate-500 mt-1 uppercase tracking-[0.3em]">Systeme nu</p>
                 </div>

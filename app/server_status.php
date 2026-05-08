@@ -1,7 +1,7 @@
 <?php
 /**
  * app/server_status.php
- * Visualisation de l'état du serveur (Swoole, Système, DB)
+ * Visualisation de l'état du serveur (Workerman, Système, DB)
  */
 
 require_once __DIR__ . '/auth.php';
@@ -15,7 +15,7 @@ $baseHref = "../";
 require_once __DIR__ . '/header.php';
 
 // Fonctions de diagnostic
-function isSwooleRunning($host = '127.0.0.1', $port = 8000) {
+function isWorkermanRunning($host = '127.0.0.1', $port = 8001) {
     $connection = @fsockopen($host, $port, $errno, $errstr, 1);
     if (is_resource($connection)) {
         fclose($connection);
@@ -24,7 +24,7 @@ function isSwooleRunning($host = '127.0.0.1', $port = 8000) {
     return false;
 }
 
-$swooleStatus = isSwooleRunning();
+$workermanStatus = isWorkermanRunning();
 $db = getDB();
 $dbStatus = $db ? true : false;
 
@@ -46,19 +46,19 @@ $memory = round(memory_get_usage() / 1024 / 1024, 2) . " MB";
     </div>
 
     <div class="grid gap-8 md:grid-cols-3">
-        <!-- Carte Swoole -->
+        <!-- Carte Workerman -->
         <div class="rounded-3xl bg-white dark:bg-slate-800 p-8 shadow-xl border border-slate-100 dark:border-white/5">
             <div class="flex items-center justify-between mb-6">
-                <div class="h-12 w-12 rounded-2xl flex items-center justify-center <?= $swooleStatus ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500' ?>">
+                <div class="h-12 w-12 rounded-2xl flex items-center justify-center <?= $workermanStatus ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500' ?>">
                     <i class="fas fa-bolt text-xl"></i>
                 </div>
-                <span class="text-[8px] font-black uppercase tracking-widest <?= $swooleStatus ? 'text-emerald-500' : 'text-red-500' ?>">
-                    <?= $swooleStatus ? 'En ligne' : 'Hors ligne' ?>
+                <span class="text-[8px] font-black uppercase tracking-widest <?= $workermanStatus ? 'text-emerald-500' : 'text-red-500' ?>">
+                    <?= $workermanStatus ? 'En ligne' : 'Hors ligne' ?>
                 </span>
             </div>
             <h3 class="text-xs font-black uppercase text-slate-400 mb-2">Moteur Temps Réel</h3>
-            <p class="text-xl font-black text-slate-900 dark:text-white uppercase">Swoole WebSocket</p>
-            <?php if (!$swooleStatus): ?>
+            <p class="text-xl font-black text-slate-900 dark:text-white uppercase">Workerman WebSocket</p>
+            <?php if (!$workermanStatus): ?>
                 <p class="mt-4 text-[9px] font-bold text-slate-500 leading-relaxed italic">Le serveur WebSocket n'est pas lancé. Les notifications temps réel ne fonctionneront pas.</p>
             <?php endif; ?>
         </div>
@@ -91,11 +91,11 @@ $memory = round(memory_get_usage() / 1024 / 1024, 2) . " MB";
     </div>
 
     <!-- Actions -->
-    <?php if (!$swooleStatus): ?>
+    <?php if (!$workermanStatus): ?>
     <div class="mt-12 rounded-3xl bg-slate-900 p-10 text-center border border-white/5">
         <h3 class="text-lg font-black text-white uppercase mb-4 tracking-tighter">Relancer le moteur temps réel</h3>
-        <p class="text-xs text-slate-400 mb-8 max-w-lg mx-auto leading-relaxed">Si vous n'avez pas accès au terminal, vous pouvez tenter de démarrer le serveur Swoole en arrière-plan ici.</p>
-        <button onclick="startSwoole()" id="btnStartSwoole" class="rounded-2xl bg-white px-10 py-5 text-[11px] font-black uppercase tracking-widest text-slate-900 hover:bg-indigo-500 hover:text-white transition shadow-2xl">
+        <p class="text-xs text-slate-400 mb-8 max-w-lg mx-auto leading-relaxed">Si vous n'avez pas accès au terminal, vous pouvez tenter de démarrer le serveur Workerman en arrière-plan ici.</p>
+        <button onclick="startWorkerman()" id="btnStartWorkerman" class="rounded-2xl bg-white px-10 py-5 text-[11px] font-black uppercase tracking-widest text-slate-900 hover:bg-indigo-500 hover:text-white transition shadow-2xl">
             Lancer le serveur
         </button>
     </div>
@@ -103,8 +103,8 @@ $memory = round(memory_get_usage() / 1024 / 1024, 2) . " MB";
 </main>
 
 <script>
-async function startSwoole() {
-    const btn = document.getElementById('btnStartSwoole');
+async function startWorkerman() {
+    const btn = document.getElementById('btnStartWorkerman');
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-circle-notch animate-spin mr-3"></i> Lancement...';
     
@@ -112,7 +112,7 @@ async function startSwoole() {
         const res = await fetch('<?= $baseHref ?>app/run_swoole.php');
         const data = await res.json();
         if (data.ok) {
-            alert("Le serveur Swoole a été lancé en arrière-plan !");
+            alert("Le serveur Workerman a été lancé en arrière-plan !");
             location.reload();
         } else {
             alert("Erreur : " + data.message);

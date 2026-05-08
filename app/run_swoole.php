@@ -1,7 +1,7 @@
 <?php
 /**
  * app/run_swoole.php
- * Script pour lancer le serveur Swoole en arrière-plan
+ * Script pour lancer le serveur Workerman en arrière-plan
  */
 
 require_once __DIR__ . '/auth.php';
@@ -9,7 +9,7 @@ check_admin();
 
 header('Content-Type: application/json');
 
-function isSwooleRunning($host = '127.0.0.1', $port = 8000) {
+function isWorkermanRunning($host = '127.0.0.1', $port = 8001) {
     $connection = @fsockopen($host, $port, $errno, $errstr, 1);
     if (is_resource($connection)) {
         fclose($connection);
@@ -18,12 +18,12 @@ function isSwooleRunning($host = '127.0.0.1', $port = 8000) {
     return false;
 }
 
-if (isSwooleRunning()) {
-    echo json_encode(['ok' => true, 'message' => 'Swoole est déjà en cours d\'exécution.']);
+if (isWorkermanRunning()) {
+    echo json_encode(['ok' => true, 'message' => 'Workerman est déjà en cours d\'exécution.']);
     exit;
 }
 
-$cmd = "php " . escapeshellarg(__DIR__ . '/swoole_server.php');
+$cmd = "php " . escapeshellarg(__DIR__ . '/workerman_server.php');
 
 if (PHP_OS_FAMILY === 'Windows') {
     // Lancer en arrière-plan sous Windows
@@ -36,8 +36,8 @@ if (PHP_OS_FAMILY === 'Windows') {
 // Attendre un court instant pour vérifier si le port s'ouvre
 sleep(1);
 
-if (isSwooleRunning()) {
+if (isWorkermanRunning()) {
     echo json_encode(['ok' => true, 'message' => 'Serveur lancé avec succès.']);
 } else {
-    echo json_encode(['ok' => false, 'message' => 'Le serveur a tenté de démarrer mais le port 8000 reste fermé.']);
+    echo json_encode(['ok' => false, 'message' => 'Le serveur a tenté de démarrer mais le port 8001 reste fermé.']);
 }

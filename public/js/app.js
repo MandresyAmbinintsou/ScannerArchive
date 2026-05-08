@@ -32,6 +32,7 @@ const els = {
     btnRefresh:     document.getElementById('btnRefresh'),
     placeholder:    document.getElementById('placeholder'),
     detailView:     document.getElementById('detailView'),
+    detailContent:  document.getElementById('detailContent'),
     detailTitle:    document.getElementById('detailTitle'),
     sousdossierGrid:document.getElementById('sousdossierGrid'),
     galerieSection: document.getElementById('galerieSection'),
@@ -55,7 +56,7 @@ function showToast(message, type = 'info') {
     if (!els.notificationToast) {
         const container = document.createElement('div');
         container.id = 'toast-container';
-        container.className = 'fixed bottom-8 right-8 z-[200] flex flex-col gap-3';
+        container.className = 'fixed top-8 left-1/2 z-[200] flex flex-col gap-3 -translate-x-1/2 items-center';
         document.body.appendChild(container);
         els.notificationToast = container;
     }
@@ -94,11 +95,12 @@ function showToast(message, type = 'info') {
  */
 let socket = null;
 function initSocket() {
-    const dot = document.getElementById('swooleStatusDot');
+    const dot = document.getElementById('realtimeStatusDot');
     try {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const port = 8001;
         const host = window.location.hostname;
-        socket = new WebSocket(`${protocol}//${host}:8000`);
+        socket = new WebSocket(`${protocol}//${host}:${port}`);
 
         socket.onopen = () => {
             if (dot) {
@@ -276,7 +278,7 @@ function renderLoadMore() {
 function attachMatriculeEvents() {
     els.matriculeList.querySelectorAll('.matricule-row').forEach(el => {
         el.addEventListener('click', () => {
-            selectMatricule(parseInt(el.dataset.id), el.dataset.nom);
+            selectMatricule(parseInt(el.dataset.id), el.dataset.nom, el);
             els.matriculeList.querySelectorAll('.matricule-row').forEach(r => r.classList.remove('border-indigo-600', 'bg-indigo-50/50', 'dark:bg-slate-900', 'shadow-inner'));
             el.classList.add('border-indigo-600', 'bg-indigo-50/50', 'dark:bg-slate-900', 'shadow-inner');
         });
@@ -286,26 +288,36 @@ function attachMatriculeEvents() {
 /**
  * Sélection d'un matricule
  */
-async function selectMatricule(id, nom) {
+async function selectMatricule(id, nom, clickedEl = null) {
     if (state.currentMatricule?.id === id) return;
     
-    // Remonter en haut pour voir le contenu (Meilleure UX)
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-
+    // 1. Mémoriser la position et figer la hauteur pour éviter le "shrink"
+    const scrollY = window.scrollY;
+    document.body.style.minHeight = document.documentElement.scrollHeight + 'px';
+    
     state.currentMatricule = { id, nom };
     state.isSplitView = true;
     
-    // Transition fluide du layout
+    // 2. Appliquer les changements de layout
     els.mainContainer.classList.replace('max-w-6xl', 'max-w-[1700px]');
     els.layoutWrapper.classList.replace('flex-col', 'md:flex-row');
-    els.layoutWrapper.classList.add('items-start');
+    // Suppression de items-start pour que la colonne de droite s'étire sur toute la hauteur
+    els.layoutWrapper.classList.remove('items-start'); 
     
     els.sidebarList.classList.remove('w-full', 'max-w-3xl', 'mx-auto');
     els.sidebarList.classList.add('md:w-[450px]', 'shrink-0');
     
-    // Affichage immédiat du loader dans la vue détail
+    // 3. Affichage immédiat du bloc détail
     els.detailView.classList.remove('hidden');
     els.detailTitle.textContent = nom;
+    els.detailContent.scrollTop = 0; // On remet le scroll interne du détail à zéro
+
+    // 4. RESTAURER la position pour éviter le saut (important)
+    window.scrollTo(0, scrollY);
+    setTimeout(() => { document.body.style.minHeight = ''; }, 100);
+    
+    // 5. Charger les données
+    els.galerieSection.classList.add('hidden');
     els.sousdossierGrid.innerHTML = `
         <div class="col-span-full py-32 text-center">
             <div class="inline-flex h-16 w-16 items-center justify-center rounded-full border-4 border-indigo-600/20 border-t-indigo-600 animate-spin mb-6"></div>
@@ -407,21 +419,26 @@ function closeLightbox() {
 
 // RETOUR : Reset layout
 els.btnBack?.addEventListener('click', () => {
+    const scrollY = window.scrollY;
+    document.body.style.minHeight = document.documentElement.scrollHeight + 'px';
+
     state.currentMatricule = null;
     state.isSplitView = false;
-    
+
     els.detailView.classList.add('hidden');
     els.mainContainer.classList.replace('max-w-[1700px]', 'max-w-6xl');
     els.layoutWrapper.classList.replace('md:flex-row', 'flex-col');
-    els.layoutWrapper.classList.remove('items-start');
-    
+
     els.sidebarList.classList.remove('md:w-[450px]', 'shrink-0');
     els.sidebarList.classList.add('w-full', 'max-w-3xl', 'mx-auto');
-    
-    els.matriculeList.querySelectorAll('.matricule-row').forEach(r => r.classList.remove('border-indigo-600', 'bg-indigo-50/50', 'dark:bg-slate-900', 'shadow-inner'));
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-});
 
+    els.matriculeList.querySelectorAll('.matricule-row').forEach(r => {
+        r.classList.remove('border-indigo-600', 'bg-indigo-50/50', 'dark:bg-slate-900', 'shadow-inner');
+    });
+
+    window.scrollTo(0, scrollY);
+    setTimeout(() => { document.body.style.minHeight = ''; }, 100);
+});
 els.btnCloseGalerie?.addEventListener('click', () => {
     els.galerieSection.classList.add('hidden');
 });

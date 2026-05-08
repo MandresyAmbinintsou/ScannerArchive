@@ -19,7 +19,7 @@ require_once 'app/header.php';
     </section>
 
     <!-- Layout Master-Detail -->
-    <div id="layoutWrapper" class="flex flex-col gap-12 transition-all duration-500">
+    <div id="layoutWrapper" class="flex flex-col gap-12 transition-none">
         
         <!-- Colonne GAUCHE : Répertoire -->
         <aside id="sidebarList" class="w-full max-w-3xl mx-auto transition-all duration-500 ease-in-out">
@@ -46,7 +46,7 @@ require_once 'app/header.php';
 
         <!-- Colonne DROITE : Détails -->
         <section id="detailView" class="hidden flex-1 animate-in fade-in slide-in-from-right-12 duration-700">
-            <div class="sticky top-28 space-y-10">
+            <div id="detailContent" class="md:sticky md:top-24 md:h-[calc(100vh-120px)] md:overflow-y-auto space-y-10 pr-4 scrollbar-thin">
                 <!-- En-tête -->
                 <div class="rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/5 p-10 shadow-2xl">
                     <div class="flex items-center justify-between mb-8">
@@ -108,6 +108,6 @@ require_once 'app/header.php';
     </div>
 </main>
 
-<script src="public/js/app.js"></script>
+<script src="public/js/app.js?v=<?php echo filemtime(__DIR__ . '/public/js/app.js'); ?>"></script>
 
 <?php require_once 'app/footer.php'; ?>

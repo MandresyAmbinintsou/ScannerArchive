@@ -2,21 +2,22 @@
 /**
  * workerman_server.php - Serveur Workerman Simple et Fiable
  * Alternative Windows à Swoole - Compatible avec votre app
- * Port 8000 : WebSocket + APIs HTTP
+ * Port 8001 : WebSocket notifications
  */
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/scan.php';
 
 use Workerman\Worker;
-use Workerman\Lib\Timer;
+use Workerman\Timer;
 
 echo "\n=== Archive Viewer - Serveur Workerman ===\n\n";
 
 // ============================================================
-// Serveur WebSocket Principal (Port 8000)
+// Serveur WebSocket Principal (Port 8001)
 // ============================================================
-$wsWorker = new Worker("websocket://0.0.0.0:8000");
+$wsWorker = new Worker("websocket://0.0.0.0:8001");
 $wsWorker->count = 1; // Windows limitation
 $wsWorker->name = 'ArchiveViewerWS';
 
@@ -27,6 +28,7 @@ $wsWorker->scanStatus = ['status' => 'idle', 'progress' => 0];
 // Événement : connexion établie
 $wsWorker->onWebSocketConnect = function($connection) use ($wsWorker) {
     echo "[✓] Client WebSocket connecté : {$connection->id}\n";
+    $wsWorker->clients[$connection->id] = $connection;
     
     // Envoyer statut initial
     $connection->send(json_encode([
@@ -44,7 +46,6 @@ $wsWorker->onMessage = function($connection, $data) use ($wsWorker) {
     if (($msg['action'] ?? '') === 'start_scan') {
         echo "[→] Scan demandé par le client\n";
         
-        // Notifier tous les clients
         foreach ($wsWorker->clients as $client) {
             @$client->send(json_encode([
                 'type' => 'progress',
@@ -57,75 +58,71 @@ $wsWorker->onMessage = function($connection, $data) use ($wsWorker) {
 
 // Événement : connexion fermée
 $wsWorker->onClose = function($connection) use ($wsWorker) {
+    unset($wsWorker->clients[$connection->id]);
     echo "[✗] Client WebSocket déconnecté : {$connection->id}\n";
 };
 
+$notificationFile = __DIR__ . '/.notify.json';
+$lastNotificationTime = 0;
+
+function broadcastNotification($wsWorker, $type, $message) {
+    $payload = json_encode(['type' => $type, 'message' => $message]);
+    foreach ($wsWorker->clients as $client) {
+        @$client->send($payload);
+    }
+}
+
 // Événement : worker démarré
-$wsWorker->onWorkerStart = function($worker) {
-    echo "[✓] Serveur WebSocket lancé sur ws://0.0.0.0:8000\n";
-    echo "[✓] Accédez à http://localhost:8000\n";
+$wsWorker->onWorkerStart = function($worker) use ($wsWorker, $notificationFile, &$lastNotificationTime) {
+    echo "[✓] Serveur WebSocket lancé sur ws://0.0.0.0:8001\n";
+    echo "[✓] Accédez à http://localhost:8000 pour l'interface PHP\n";
     
     // Scan automatique toutes les 5 minutes
     Timer::add(300, function() use ($worker) {
         echo "[→] Scan automatique lancé\n";
-        
-        $msg = [
+
+        $startMsg = [
             'type' => 'progress',
             'message' => 'Scan automatique en cours...',
-            'progress' => 15
+            'progress' => 10
         ];
-        
         foreach ($worker->clients as $client) {
-            @$client->send(json_encode($msg));
+            @$client->send(json_encode($startMsg));
+        }
+
+        try {
+            $summary = scanArchive(getDB(), ARCHIVE_ROOT);
+            echo "[✓] Scan automatique terminé\n";
+            broadcastNotification($worker, 'finish', 'Indexation automatique terminée - nouveaux matricules disponibles');
+
+            // Écrire aussi le fichier de notification pour compatibilité
+            @file_put_contents($notificationFile, json_encode([
+                'type' => 'finish',
+                'message' => 'Indexation automatique terminée - nouveaux matricules disponibles',
+                'timestamp' => time(),
+            ]));
+        } catch (Exception $e) {
+            echo "[✗] Erreur lors du scan automatique : {$e->getMessage()}\n";
+            broadcastNotification($worker, 'error', 'Erreur du scan automatique : ' . $e->getMessage());
         }
     });
-};
 
-// ============================================================
-// Serveur HTTP pour les APIs (même port 8000, upgrade protocol)
-// ============================================================
-
-$httpWorker = new Worker("http://0.0.0.0:8000");
-$httpWorker->count = 1;
-$httpWorker->name = 'ArchiveViewerAPI';
-
-$httpWorker->onMessage = function($connection, $data) {
-    // Parser la requête HTTP
-    if (!preg_match('/^([A-Z]+)\s+([^\s?]+)(?:\?([^\s]*))?\s+HTTP/', $data, $matches)) {
-        sendResponse($connection, 'Bad Request', 400);
-        return;
-    }
-    
-    $method = $matches[1];
-    $path = $matches[2];
-    $queryString = $matches[3] ?? '';
-    
-    // ========== ROUTER DES APIs ==========
-    
-    if ($path === '/app/matricules.php') {
-        handleMatricules($connection, $queryString);
-        return;
-    }
-    
-    if ($path === '/app/sousdossiers.php') {
-        handleSousdossiers($connection, $queryString);
-        return;
-    }
-    
-    if ($path === '/app/images.php') {
-        handleImages($connection, $queryString);
-        return;
-    }
-    
-    // Fichiers statiques
-    $publicFile = __DIR__ . '/..' . $path;
-    if (is_file($publicFile) && isAllowedFile($publicFile)) {
-        serveStaticFile($connection, $publicFile);
-        return;
-    }
-    
-    // Fallback : servir index.php (SPA)
-    serveStaticFile($connection, __DIR__ . '/../index.php');
+    // Vérifier les notifications créées par l'API de refresh
+    Timer::add(1, function() use ($wsWorker, $notificationFile, &$lastNotificationTime) {
+        if (!file_exists($notificationFile)) {
+            return;
+        }
+        $payload = @json_decode(file_get_contents($notificationFile), true);
+        if (!is_array($payload) || empty($payload['timestamp'])) {
+            return;
+        }
+        if ($payload['timestamp'] <= $lastNotificationTime) {
+            return;
+        }
+        $lastNotificationTime = $payload['timestamp'];
+        broadcastNotification($wsWorker, $payload['type'] ?? 'status', $payload['message'] ?? 'Mise à jour disponible');
+        @unlink($notificationFile);
+    });
 };
 
 // ============================================================

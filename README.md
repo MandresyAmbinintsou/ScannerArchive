@@ -14,7 +14,7 @@ Le projet propose deux moteurs d’indexation :
 - **PHP fallback** : scan + insertion DB 100% PHP.
 - **Go scanner** : binaire Go qui lit le filesystem très rapidement et émet du JSONL pour ingestion PHP.
 
-## 🚀 Architecture principale
+##  Architecture principale
 
 ```
 /
@@ -38,7 +38,7 @@ Le projet propose deux moteurs d’indexation :
 └── docker-compose.yml        PostgreSQL optionnel
 ```
 
-## 🌍 Support et portabilité
+##  Support et portabilité
 
 - **Windows** : le binaire `bin/scannerfs.exe` est utilisé pour accélérer le scan.
 - **Fallback PHP** : si Go est indisponible, l’application bascule automatiquement sur `scan.php`.
@@ -47,7 +47,7 @@ Le projet propose deux moteurs d’indexation :
 
 Voir `docs/mode_emploi.md` pour la configuration avancée et le déploiement cross-plateforme.
 
-## ⚡ Vitesse réelle du scan — PHP vs Go
+##  Vitesse réelle du scan — PHP vs Go
 
 Le vrai temps de scan s’affiche à la fin de chaque exécution :
 - **PHP fallback** : durée mesurée par `app/scan.php` et affichée comme `Durée : Xs`.
@@ -76,16 +76,39 @@ Le vrai temps de scan s’affiche à la fin de chaque exécution :
 }
 ```
 
-## 📦 Installation rapide
+##  Installation & Dépendances
+
+Pour faire fonctionner le projet, vous avez besoin de :
+
+1.  **PHP 8.0+** avec les extensions `pdo_pgsql`, `gd`, `sockets`.
+2.  **Composer** : Indispensable pour gérer les dépendances PHP (Workerman, etc.).
+    ```bash
+    composer install
+    ```
+3.  **Go (Optionnel)** : Uniquement si vous souhaitez recompiler le scanner ultra-rapide dans `cmd/scannerfs`. Les binaires sont déjà fournis dans `bin/`.
+4.  **PostgreSQL** : La base de données doit être installée et configurée (voir `config/database.php`).
+5.  **Serveur Web** : Apache (XAMPP) ou le serveur intégré de PHP.
+
+##  Améliorations UX Récentes
+
+L'interface a été optimisée pour une navigation fluide de type "Explorateur" :
+- **Split-View Stable** : La page ne saute plus lors du clic sur un matricule. Votre position de défilement est préservée.
+- **Défilement Indépendant** : La liste des matricules et la zone de détails possèdent des barres de défilement autonomes.
+- **Détails Sticky** : Le contenu du dossier sélectionné reste toujours dans votre champ de vision, même si vous parcourez une longue liste.
+
+##  Installation rapide
 
 Voir `docs/USAGE.md` pour :
 - configuration PostgreSQL
 - lancement du serveur
 - indexation avec PHP ou Go
 
-## 📌 Bonnes pratiques
+##  Bonnes pratiques
 
 - Utilisez **SSD** pour de meilleures vitesses d’indexation.
 - Exécutez plusieurs fois le même scan pour mesurer la vitesse réelle et lisser les variations de cache.
 - Si `scannerfs.exe` est absent, le projet reste fonctionnel avec le moteur PHP.
 
+##  Auteur
+
+- Mandresy Ambinintsou 

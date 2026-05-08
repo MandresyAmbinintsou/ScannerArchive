@@ -1,0 +1,31 @@
+2026-05-07 14:50:50 pid:1 Error: Class "Workerman\Lib\Timer" not found in C:\xampp\htdocs\GED-MEF\app\workerman_server.php:69
+Stack trace:
+#0 C:\xampp\htdocs\GED-MEF\vendor\workerman\workerman\src\Worker.php(2641): {closure}(Object(Workerman\Worker))
+#1 [internal function]: Workerman\Worker->Workerman\{closure}()
+#2 C:\xampp\htdocs\GED-MEF\vendor\workerman\workerman\src\Worker.php(2659): Fiber->start()
+#3 C:\xampp\htdocs\GED-MEF\vendor\workerman\workerman\src\Worker.php(1619): Workerman\Worker->run()
+#4 C:\xampp\htdocs\GED-MEF\vendor\workerman\workerman\src\Worker.php(1536): Workerman\Worker::forkWorkersForWindows()
+#5 C:\xampp\htdocs\GED-MEF\vendor\workerman\workerman\src\Worker.php(603): Workerman\Worker::forkWorkers()
+#6 C:\xampp\htdocs\GED-MEF\app\workerman_server.php(293): Workerman\Worker::runAll()
+#7 {main}
+2026-05-08 09:02:28 pid:1 Error: Class "Workerman\Lib\Timer" not found in C:\xampp\htdocs\GED-MEF\app\workerman_server.php:69
+Stack trace:
+#0 C:\xampp\htdocs\GED-MEF\vendor\workerman\workerman\src\Worker.php(2641): {closure}(Object(Workerman\Worker))
+#1 [internal function]: Workerman\Worker->Workerman\{closure}()
+#2 C:\xampp\htdocs\GED-MEF\vendor\workerman\workerman\src\Worker.php(2659): Fiber->start()
+#3 C:\xampp\htdocs\GED-MEF\vendor\workerman\workerman\src\Worker.php(1619): Workerman\Worker->run()
+#4 C:\xampp\htdocs\GED-MEF\vendor\workerman\workerman\src\Worker.php(1536): Workerman\Worker::forkWorkersForWindows()
+#5 C:\xampp\htdocs\GED-MEF\vendor\workerman\workerman\src\Worker.php(603): Workerman\Worker::forkWorkers()
+#6 C:\xampp\htdocs\GED-MEF\app\workerman_server.php(246): Workerman\Worker::runAll()
+#7 {main}
+2026-05-08 09:53:12 pid:1 ValueError: Path cannot be empty in C:\xampp\htdocs\GED-MEF\app\workerman_server.php:102
+Stack trace:
+#0 C:\xampp\htdocs\GED-MEF\app\workerman_server.php(102): file_put_contents('', '{"type":"finish...')
+#1 C:\xampp\htdocs\GED-MEF\vendor\workerman\workerman\src\Events\Select.php(483): {closure}()
+#2 C:\xampp\htdocs\GED-MEF\vendor\workerman\workerman\src\Events\Select.php(340): Workerman\Events\Select->safeCall(Object(Closure), Array)
+#3 C:\xampp\htdocs\GED-MEF\vendor\workerman\workerman\src\Events\Select.php(426): Workerman\Events\Select->tick()
+#4 C:\xampp\htdocs\GED-MEF\vendor\workerman\workerman\src\Worker.php(1620): Workerman\Events\Select->run()
+#5 C:\xampp\htdocs\GED-MEF\vendor\workerman\workerman\src\Worker.php(1536): Workerman\Worker::forkWorkersForWindows()
+#6 C:\xampp\htdocs\GED-MEF\vendor\workerman\workerman\src\Worker.php(603): Workerman\Worker::forkWorkers()
+#7 C:\xampp\htdocs\GED-MEF\app\workerman_server.php(290): Workerman\Worker::runAll()
+#8 {main}
