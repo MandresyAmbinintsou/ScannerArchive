@@ -29,3 +29,12 @@ build darwin arm64 ""
 
 echo "Done: ${OUT_DIR}"
 
+# Copy to bin/ for immediate use
+echo "Updating bin/..."
+mkdir -p "${ROOT_DIR}/bin"
+[ -f "${OUT_DIR}/scannerfs-linux-amd64" ] && cp "${OUT_DIR}/scannerfs-linux-amd64" "${ROOT_DIR}/bin/scannerfs"
+[ -f "${OUT_DIR}/scannerfs-windows-amd64.exe" ] && cp "${OUT_DIR}/scannerfs-windows-amd64.exe" "${ROOT_DIR}/bin/scannerfs.exe"
+chmod +x "${ROOT_DIR}/bin/scannerfs"* 2>/dev/null || true
+
+echo "Binaries updated in bin/"
+

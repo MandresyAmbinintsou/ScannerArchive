@@ -16,6 +16,10 @@ const state = {
     search: '',
     searchTimeout: null,
     currentMatricule: null,
+    currentSousDossier: null,
+    galeriePage: 1,
+    galerieLimit: 100,
+    galerieHasMore: false,
     isLoading: false,
     isSplitView: false,
     hasMore: true,
@@ -361,41 +365,80 @@ async function selectMatricule(id, nom, clickedEl = null) {
 }
 
 /**
- * Galerie
+ * Galerie avec Pagination
  */
-async function loadGalerie(sousDossierId, nom) {
-    els.galerieSection.classList.remove('hidden');
-    els.galerieTitle.textContent = nom;
-    els.galerieGrid.innerHTML = `
-        <div class="col-span-full py-10 text-center">
-            <i class="fas fa-circle-notch animate-spin text-indigo-400 mb-2"></i>
-            <p class="text-[9px] font-black text-indigo-400/60 uppercase tracking-widest italic">Chargement des visuels...</p>
-        </div>
-    `;
-
-    els.galerieSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+async function loadGalerie(sousDossierId, nom, append = false) {
+    if (!append) {
+        state.galeriePage = 1;
+        state.currentSousDossier = { id: sousDossierId, nom: nom };
+        els.galerieSection.classList.remove('hidden');
+        els.galerieTitle.textContent = nom;
+        els.galerieGrid.innerHTML = `
+            <div id="galerieLoader" class="col-span-full py-10 text-center">
+                <i class="fas fa-circle-notch animate-spin text-indigo-400 mb-2"></i>
+                <p class="text-[9px] font-black text-indigo-400/60 uppercase tracking-widest italic">Chargement des visuels...</p>
+            </div>
+        `;
+        els.galerieSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
 
     try {
-        const data = await apiFetch(API.images, { sousdossier_id: sousDossierId });
-        const rows = data.data;
+        const data = await apiFetch(API.images, { 
+            sousdossier_id: sousDossierId,
+            page: state.galeriePage,
+            limit: state.galerieLimit
+        });
+        
+        const { data: rows, pagination } = data;
+        state.galerieHasMore = state.galeriePage < pagination.totalPages;
 
-        if (rows.length === 0) {
+        const loader = document.getElementById('galerieLoader');
+        if (loader) loader.remove();
+        
+        const btnMore = document.getElementById('btnLoadMoreImages');
+        if (btnMore) btnMore.remove();
+
+        if (rows.length === 0 && !append) {
             els.galerieGrid.innerHTML = `<div class="col-span-full py-10 text-center text-slate-500 text-[10px] font-black uppercase">Aucune image disponible</div>`;
             return;
         }
 
-        els.galerieGrid.innerHTML = rows.map(img => `
+        const html = rows.map(img => `
             <button type="button" class="img-card group relative aspect-square overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-900 shadow-lg border border-white/5" data-url="${img.url}" data-nom="${escapeHtml(img.nom_fichier)}">
                 <img class="h-full w-full object-cover transition duration-700 group-hover:scale-110 opacity-80 dark:opacity-50 group-hover:opacity-100" src="${img.url}" alt="${escapeHtml(img.nom_fichier)}" loading="lazy">
                 <div class="absolute inset-0 bg-indigo-600/10 opacity-0 group-hover:opacity-100 transition duration-500"></div>
             </button>
         `).join('');
 
+        if (append) {
+            els.galerieGrid.insertAdjacentHTML('beforeend', html);
+        } else {
+            els.galerieGrid.innerHTML = html;
+        }
+
+        // Ajouter bouton "Voir plus" si nécessaire
+        if (state.galerieHasMore) {
+            const moreHtml = `
+                <div id="btnLoadMoreImagesContainer" class="col-span-full py-8 text-center">
+                    <button id="btnLoadMoreImages" class="rounded-xl bg-slate-800 border border-white/10 px-8 py-4 text-[9px] font-black uppercase tracking-widest text-indigo-400 hover:bg-slate-700 transition">
+                        Charger la suite (${pagination.total - (state.galeriePage * state.galerieLimit)} restantes)
+                    </button>
+                </div>
+            `;
+            els.galerieGrid.insertAdjacentHTML('beforeend', moreHtml);
+            document.getElementById('btnLoadMoreImages').onclick = () => {
+                state.galeriePage++;
+                loadGalerie(sousDossierId, nom, true);
+                document.getElementById('btnLoadMoreImagesContainer').remove();
+            };
+        }
+
         els.galerieGrid.querySelectorAll('.img-card').forEach(card => {
-            card.addEventListener('click', () => openLightbox(card.dataset.url, card.dataset.nom));
+            card.onclick = () => openLightbox(card.dataset.url, card.dataset.nom);
         });
 
     } catch (err) {
+        console.error('Erreur Galerie:', err);
         els.galerieGrid.innerHTML = `<div class="col-span-full text-center text-red-500 font-black uppercase text-[10px]">Erreur Galerie</div>`;
     }
 }

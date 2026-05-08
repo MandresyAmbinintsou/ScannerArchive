@@ -15,6 +15,8 @@ function goScannerPath(): string {
     $paths = [
         __DIR__ . '/../bin/scannerfs.exe',
         __DIR__ . '/../bin/scannerfs',
+        __DIR__ . '/../dist/scannerfs-windows-amd64.exe',
+        __DIR__ . '/../dist/scannerfs-linux-amd64',
         __DIR__ . '/../scannerfs.exe',
         __DIR__ . '/../scannerfs',
     ];
@@ -22,8 +24,10 @@ function goScannerPath(): string {
     if (PHP_OS_FAMILY !== 'Windows') {
         $paths = [
             __DIR__ . '/../bin/scannerfs',
+            __DIR__ . '/../dist/scannerfs-linux-amd64',
             __DIR__ . '/../scannerfs',
             __DIR__ . '/../bin/scannerfs.exe',
+            __DIR__ . '/../dist/scannerfs-windows-amd64.exe',
             __DIR__ . '/../scannerfs.exe',
         ];
     }
@@ -83,6 +87,10 @@ function scanArchiveGo(PDO $db, string $archiveRoot, ?string $scannerPath = null
     $totalSous = 0;
     $totalImg = 0;
     $warnings = 0;
+
+    // Buffer pour batch insert des images
+    $imageBuffer = [];
+    $batchSize = 500;
 
     $db->beginTransaction();
     truncateArchiveTables($db);
@@ -145,32 +153,41 @@ function scanArchiveGo(PDO $db, string $archiveRoot, ?string $scannerPath = null
             if ($type === 'image') {
                 $img = $evt['image'] ?? null;
                 if (!is_array($img)) { $warnings++; continue; }
-                $matName = (string)($img['matricule_name'] ?? '');
-                $sousName = (string)($img['sous_name'] ?? '');
-                $fileName = (string)($img['file_name'] ?? '');
-                $fullPath = (string)($img['full_path'] ?? '');
-                if ($matName === '' || $sousName === '' || $fileName === '' || $fullPath === '') { $warnings++; continue; }
+                $matName = (string)$img['matricule_name'];
+                $sousName = (string)$img['sous_name'];
+                $fileName = (string)$img['file_name'];
+                $fullPath = (string)$img['full_path'];
 
                 $sousId = $sousIdByKey[$matName . "\n" . $sousName] ?? null;
-                if (!$sousId) { $warnings++; continue; }
+                if ($sousId) {
+                    $imageBuffer[] = $sousId;
+                    $imageBuffer[] = $fileName;
+                    $imageBuffer[] = $fullPath;
 
-                $stmtImg->execute([$sousId, $fileName, $fullPath]);
+                    if (count($imageBuffer) >= $batchSize * 3) {
+                        $placeholders = str_repeat('(?, ?, ?),', ($batchSize - 1)) . '(?, ?, ?)';
+                        $stmt = $db->prepare("INSERT INTO images (sousdossier_id, nom_fichier, chemin_complet) VALUES $placeholders");
+                        $stmt->execute($imageBuffer);
+                        $imageBuffer = [];
+                    }
+                } else {
+                    $warnings++;
+                }
                 $totalImg++;
                 continue;
             }
 
             if ($type === 'matricule_done') {
-                $m = $evt['matricule'] ?? null;
-                if (is_array($m) && isset($m['name'])) {
-                    $lastMatDone[(string)$m['name']] = $m;
-                }
                 continue;
             }
+        }
 
-            if ($type === 'summary') {
-                // Ignoré: on calcule nos propres stats côté ingestion.
-                continue;
-            }
+        // Vider le buffer restant
+        if (!empty($imageBuffer)) {
+            $count = count($imageBuffer) / 3;
+            $placeholders = str_repeat('(?, ?, ?),', ($count - 1)) . '(?, ?, ?)';
+            $stmt = $db->prepare("INSERT INTO images (sousdossier_id, nom_fichier, chemin_complet) VALUES $placeholders");
+            $stmt->execute($imageBuffer);
         }
 
         $stderr = stream_get_contents($pipes[2]);

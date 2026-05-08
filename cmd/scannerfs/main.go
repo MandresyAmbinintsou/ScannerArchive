@@ -187,6 +187,7 @@ func main() {
 
 				nbImages := 0
 				skippedSous := 0
+				var collectedImages []string
 				for _, img := range imgEntries {
 					if img.IsDir() {
 						continue
@@ -197,17 +198,13 @@ func main() {
 					}
 					nbImages++
 					if *emitImages {
-						_ = enc.Encode(Event{Type: "image", Image: &ImageItem{
-							MatriculeName: j.matName,
-							SousName:      sousName,
-							FileName:      img.Name(),
-							FullPath:      filepath.Join(sousPath, img.Name()),
-						}})
+						collectedImages = append(collectedImages, img.Name())
 					}
 				}
 
 				localImg += nbImages
 
+				// Émettre d'abord le sous-dossier pour que l'ingesteur PHP ait son ID
 				_ = enc.Encode(Event{Type: "sousdossier", Sous: &SousDossier{
 					MatriculeName: j.matName,
 					Name:          sousName,
@@ -215,6 +212,16 @@ func main() {
 					ImagesCount:   nbImages,
 					SkippedItems:  skippedSous,
 				}})
+
+				// Émettre les images seulement après le sous-dossier
+				for _, imgName := range collectedImages {
+					_ = enc.Encode(Event{Type: "image", Image: &ImageItem{
+						MatriculeName: j.matName,
+						SousName:      sousName,
+						FileName:      imgName,
+						FullPath:      filepath.Join(sousPath, imgName),
+					}})
+				}
 			}
 
 			_ = enc.Encode(Event{Type: "matricule_done", Mat: &Matricule{
