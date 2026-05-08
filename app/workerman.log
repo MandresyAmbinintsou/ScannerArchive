@@ -29,3 +29,7 @@ Stack trace:
 #6 C:\xampp\htdocs\GED-MEF\vendor\workerman\workerman\src\Worker.php(603): Workerman\Worker::forkWorkers()
 #7 C:\xampp\htdocs\GED-MEF\app\workerman_server.php(290): Workerman\Worker::runAll()
 #8 {main}
+2026-05-08 12:12:06 pid:20907 Workerman[workerman_server.php] status
+2026-05-08 12:12:06 pid:20907 Workerman[workerman_server.php] not run
+2026-05-08 12:12:15 pid:20925 Workerman[workerman_server.php] start in DAEMON mode
+2026-05-08 12:12:18 pid:20924 Workerman[workerman_server.php] status
