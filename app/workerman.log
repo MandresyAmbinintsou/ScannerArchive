@@ -33,3 +33,37 @@ Stack trace:
 2026-05-08 12:12:06 pid:20907 Workerman[workerman_server.php] not run
 2026-05-08 12:12:15 pid:20925 Workerman[workerman_server.php] start in DAEMON mode
 2026-05-08 12:12:18 pid:20924 Workerman[workerman_server.php] status
+2026-05-08 12:17:16 pid:20929 ValueError: Path cannot be empty in /media/mandresyambinintsou/2C60AFD360AFA1D6/xampp/htdocs/GED-MEF/app/workerman_server.php:99
+Stack trace:
+#0 /media/mandresyambinintsou/2C60AFD360AFA1D6/xampp/htdocs/GED-MEF/app/workerman_server.php(99): file_put_contents()
+#1 /media/mandresyambinintsou/2C60AFD360AFA1D6/xampp/htdocs/GED-MEF/vendor/workerman/workerman/src/Events/Select.php(483): {closure}()
+#2 /media/mandresyambinintsou/2C60AFD360AFA1D6/xampp/htdocs/GED-MEF/vendor/workerman/workerman/src/Events/Select.php(340): Workerman\Events\Select->safeCall()
+#3 /media/mandresyambinintsou/2C60AFD360AFA1D6/xampp/htdocs/GED-MEF/vendor/workerman/workerman/src/Events/Select.php(426): Workerman\Events\Select->tick()
+#4 /media/mandresyambinintsou/2C60AFD360AFA1D6/xampp/htdocs/GED-MEF/vendor/workerman/workerman/src/Worker.php(1758): Workerman\Events\Select->run()
+#5 /media/mandresyambinintsou/2C60AFD360AFA1D6/xampp/htdocs/GED-MEF/vendor/workerman/workerman/src/Worker.php(1554): Workerman\Worker::forkOneWorkerForLinux()
+#6 /media/mandresyambinintsou/2C60AFD360AFA1D6/xampp/htdocs/GED-MEF/vendor/workerman/workerman/src/Worker.php(1534): Workerman\Worker::forkWorkersForLinux()
+#7 /media/mandresyambinintsou/2C60AFD360AFA1D6/xampp/htdocs/GED-MEF/vendor/workerman/workerman/src/Worker.php(603): Workerman\Worker::forkWorkers()
+#8 /media/mandresyambinintsou/2C60AFD360AFA1D6/xampp/htdocs/GED-MEF/app/workerman_server.php(290): Workerman\Worker::runAll()
+#9 {main}
+2026-05-08 12:17:16 pid:20927 worker[ArchiveViewerWS:20929] exit with status 64000
+2026-05-08 12:22:17 pid:21165 ValueError: Path cannot be empty in /media/mandresyambinintsou/2C60AFD360AFA1D6/xampp/htdocs/GED-MEF/app/workerman_server.php:99
+Stack trace:
+#0 /media/mandresyambinintsou/2C60AFD360AFA1D6/xampp/htdocs/GED-MEF/app/workerman_server.php(99): file_put_contents()
+#1 /media/mandresyambinintsou/2C60AFD360AFA1D6/xampp/htdocs/GED-MEF/vendor/workerman/workerman/src/Events/Select.php(483): {closure}()
+#2 /media/mandresyambinintsou/2C60AFD360AFA1D6/xampp/htdocs/GED-MEF/vendor/workerman/workerman/src/Events/Select.php(340): Workerman\Events\Select->safeCall()
+#3 /media/mandresyambinintsou/2C60AFD360AFA1D6/xampp/htdocs/GED-MEF/vendor/workerman/workerman/src/Events/Select.php(426): Workerman\Events\Select->tick()
+#4 /media/mandresyambinintsou/2C60AFD360AFA1D6/xampp/htdocs/GED-MEF/vendor/workerman/workerman/src/Worker.php(1758): Workerman\Events\Select->run()
+#5 /media/mandresyambinintsou/2C60AFD360AFA1D6/xampp/htdocs/GED-MEF/vendor/workerman/workerman/src/Worker.php(1554): Workerman\Worker::forkOneWorkerForLinux()
+#6 /media/mandresyambinintsou/2C60AFD360AFA1D6/xampp/htdocs/GED-MEF/vendor/workerman/workerman/src/Worker.php(1534): Workerman\Worker::forkWorkersForLinux()
+#7 /media/mandresyambinintsou/2C60AFD360AFA1D6/xampp/htdocs/GED-MEF/vendor/workerman/workerman/src/Worker.php(1903): Workerman\Worker::forkWorkers()
+#8 /media/mandresyambinintsou/2C60AFD360AFA1D6/xampp/htdocs/GED-MEF/vendor/workerman/workerman/src/Worker.php(1838): Workerman\Worker::monitorWorkersForLinux()
+#9 /media/mandresyambinintsou/2C60AFD360AFA1D6/xampp/htdocs/GED-MEF/vendor/workerman/workerman/src/Worker.php(605): Workerman\Worker::monitorWorkers()
+#10 /media/mandresyambinintsou/2C60AFD360AFA1D6/xampp/htdocs/GED-MEF/app/workerman_server.php(290): Workerman\Worker::runAll()
+#11 {main}
+2026-05-08 12:22:17 pid:20927 worker[ArchiveViewerWS:21165] exit with status 64000
+2026-05-08 12:26:30 pid:21432 Workerman[workerman_server.php] restart
+2026-05-08 12:26:30 pid:21432 Workerman[workerman_server.php] is stopping ...
+2026-05-08 12:26:30 pid:20927 Workerman[workerman_server.php] received signal SIGINT
+2026-05-08 12:26:30 pid:20927 Workerman[workerman_server.php] stopping
+2026-05-08 12:26:30 pid:20927 Workerman[workerman_server.php] has been stopped
+2026-05-08 12:26:30 pid:21432 Workerman[workerman_server.php] stop success

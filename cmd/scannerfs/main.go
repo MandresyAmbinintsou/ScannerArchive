@@ -140,35 +140,69 @@ func main() {
 	jobs := make(chan job)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
+	var emitMu sync.Mutex
 
 	allowedExt := map[string]struct{}{
-		".jpg": {}, ".jpeg": {}, ".png": {}, ".gif": {}, ".webp": {},
+		".jpg": {}, ".jpeg": {}, ".png": {}, ".gif": {}, ".webp": {}, ".pdf": {},
+	}
+
+	emit := func(ev Event) {
+		emitMu.Lock()
+		_ = enc.Encode(ev)
+		emitMu.Unlock()
 	}
 
 	workerFn := func() {
 		defer wg.Done()
 		for j := range jobs {
 			matPath := filepath.Join(root, j.matName)
-			sousEntries, err := os.ReadDir(matPath)
-			if err != nil {
-				warn(fmt.Sprintf("Impossible de lire %s: %v", matPath, err))
+			if st, err := os.Stat(matPath); err != nil || !st.IsDir() {
+				warn(fmt.Sprintf("Dossier matricule invalide %s: %v", matPath, err))
 				continue
 			}
 
-			// Collect sous-dossiers (dirs only)
-			sousNames := make([]string, 0, len(sousEntries))
-			for _, s := range sousEntries {
-				if s.IsDir() {
-					sousNames = append(sousNames, s.Name())
+			// Liste récursive des dossiers (inclut '.' pour indexer les fichiers à la racine du matricule).
+			type dirJob struct {
+				rel string // '.' ou 'avancement/2026'
+				abs string
+			}
+			dirQueue := []dirJob{{rel: ".", abs: matPath}}
+
+			var dirJobs []dirJob
+			skippedMat := 0
+			for len(dirQueue) > 0 {
+				cur := dirQueue[0]
+				dirQueue = dirQueue[1:]
+				dirJobs = append(dirJobs, cur)
+
+				entries, err := os.ReadDir(cur.abs)
+				if err != nil {
+					warn(fmt.Sprintf("Impossible de lire %s: %v", cur.abs, err))
+					skippedMat++
+					continue
+				}
+				for _, e := range entries {
+					if !e.IsDir() {
+						continue
+					}
+					name := e.Name()
+					rel := name
+					if cur.rel != "." {
+						rel = cur.rel + "/" + name
+					}
+					dirQueue = append(dirQueue, dirJob{
+						rel: rel,
+						abs: filepath.Join(cur.abs, name),
+					})
 				}
 			}
-			sort.Strings(sousNames)
 
-			localSous := len(sousNames)
+			sort.Slice(dirJobs, func(i, k int) bool { return dirJobs[i].rel < dirJobs[k].rel })
+
+			localSous := len(dirJobs)
 			localImg := 0
-			skippedMat := 0
 
-			_ = enc.Encode(Event{Type: "matricule", Mat: &Matricule{
+			emit(Event{Type: "matricule", Mat: &Matricule{
 				Name:         j.matName,
 				Path:         matPath,
 				SousCount:    localSous,
@@ -176,11 +210,10 @@ func main() {
 				SkippedItems: 0,
 			}})
 
-			for _, sousName := range sousNames {
-				sousPath := filepath.Join(matPath, sousName)
-				imgEntries, err := os.ReadDir(sousPath)
+			for _, d := range dirJobs {
+				imgEntries, err := os.ReadDir(d.abs)
 				if err != nil {
-					warn(fmt.Sprintf("Impossible de lire %s: %v", sousPath, err))
+					warn(fmt.Sprintf("Impossible de lire %s: %v", d.abs, err))
 					skippedMat++
 					continue
 				}
@@ -204,27 +237,25 @@ func main() {
 
 				localImg += nbImages
 
-				// Émettre d'abord le sous-dossier pour que l'ingesteur PHP ait son ID
-				_ = enc.Encode(Event{Type: "sousdossier", Sous: &SousDossier{
+				emit(Event{Type: "sousdossier", Sous: &SousDossier{
 					MatriculeName: j.matName,
-					Name:          sousName,
-					Path:          sousPath,
+					Name:          d.rel,
+					Path:          d.abs,
 					ImagesCount:   nbImages,
 					SkippedItems:  skippedSous,
 				}})
 
-				// Émettre les images seulement après le sous-dossier
 				for _, imgName := range collectedImages {
-					_ = enc.Encode(Event{Type: "image", Image: &ImageItem{
+					emit(Event{Type: "image", Image: &ImageItem{
 						MatriculeName: j.matName,
-						SousName:      sousName,
+						SousName:      d.rel,
 						FileName:      imgName,
-						FullPath:      filepath.Join(sousPath, imgName),
+						FullPath:      filepath.Join(d.abs, imgName),
 					}})
 				}
 			}
 
-			_ = enc.Encode(Event{Type: "matricule_done", Mat: &Matricule{
+			emit(Event{Type: "matricule_done", Mat: &Matricule{
 				Name:         j.matName,
 				Path:         matPath,
 				SousCount:    localSous,

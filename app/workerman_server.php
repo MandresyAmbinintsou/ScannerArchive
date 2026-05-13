@@ -18,12 +18,11 @@ echo "\n=== Archive Viewer - Serveur Workerman ===\n\n";
 // Serveur WebSocket Principal (Port 8001)
 // ============================================================
 $wsWorker = new Worker("websocket://0.0.0.0:8001");
-$wsWorker->count = 1; // Windows limitation
+$wsWorker->count = 1; // Limitation Windows : un seul processus
 $wsWorker->name = 'ArchiveViewerWS';
 
 // Propriétés partagées
 $wsWorker->clients = [];
-$wsWorker->scanStatus = ['status' => 'idle', 'progress' => 0];
 
 // Événement : connexion établie
 $wsWorker->onWebSocketConnect = function($connection) use ($wsWorker) {
@@ -45,14 +44,7 @@ $wsWorker->onMessage = function($connection, $data) use ($wsWorker) {
     
     if (($msg['action'] ?? '') === 'start_scan') {
         echo "[→] Scan demandé par le client\n";
-        
-        foreach ($wsWorker->clients as $client) {
-            @$client->send(json_encode([
-                'type' => 'progress',
-                'message' => 'Scan en cours...',
-                'progress' => 25
-            ]));
-        }
+        broadcastNotification($wsWorker, 'progress', 'Scan en cours...');
     }
 };
 
@@ -75,63 +67,35 @@ function broadcastNotification($wsWorker, $type, $message) {
 // Événement : worker démarré
 $wsWorker->onWorkerStart = function($worker) use ($wsWorker, $notificationFile, &$lastNotificationTime) {
     echo "[✓] Serveur WebSocket lancé sur ws://0.0.0.0:8001\n";
-    echo "[✓] Accédez à http://localhost:8000 pour l'interface PHP\n";
+    echo "[✓] Accédez à votre interface via WAMP (ex: http://localhost/GED-MEF)\n";
     
-    // Scan automatique toutes les 5 minutes
-    Timer::add(300, function() use ($worker) {
-        echo "[→] Scan automatique lancé\n";
+    // --- WATCHER DÉSACTIVÉ ---
+    // Nous ne surveillons plus les dossiers automatiquement pour éviter de mélanger les images
+    // des différents répertoires indexés manuellement par l'utilisateur.
 
-        $startMsg = [
-            'type' => 'progress',
-            'message' => 'Scan automatique en cours...',
-            'progress' => 10
-        ];
-        foreach ($worker->clients as $client) {
-            @$client->send(json_encode($startMsg));
-        }
-
-        try {
-            $summary = scanArchive(getDB(), ARCHIVE_ROOT);
-            echo "[✓] Scan automatique terminé\n";
-            broadcastNotification($worker, 'finish', 'Indexation automatique terminée - nouveaux matricules disponibles');
-
-            // Écrire aussi le fichier de notification pour compatibilité
-            @file_put_contents($notificationFile, json_encode([
-                'type' => 'finish',
-                'message' => 'Indexation automatique terminée - nouveaux matricules disponibles',
-                'timestamp' => time(),
-            ]));
-        } catch (Exception $e) {
-            echo "[✗] Erreur lors du scan automatique : {$e->getMessage()}\n";
-            broadcastNotification($worker, 'error', 'Erreur du scan automatique : ' . $e->getMessage());
-        }
-    });
-
-    // Vérifier les notifications créées par l'API de refresh
+    // Vérifier les notifications créées par l'API (ex: refresh.php ou indexer.php)
     Timer::add(1, function() use ($wsWorker, $notificationFile, &$lastNotificationTime) {
-        if (!file_exists($notificationFile)) {
-            return;
-        }
-        $payload = @json_decode(file_get_contents($notificationFile), true);
-        if (!is_array($payload) || empty($payload['timestamp'])) {
-            return;
-        }
-        if ($payload['timestamp'] <= $lastNotificationTime) {
-            return;
-        }
+        if (!file_exists($notificationFile)) return;
+        
+        $content = @file_get_contents($notificationFile);
+        $payload = @json_decode($content, true);
+        
+        if (!is_array($payload) || empty($payload['timestamp'])) return;
+        if ($payload['timestamp'] <= $lastNotificationTime) return;
+        
         $lastNotificationTime = $payload['timestamp'];
-        broadcastNotification($wsWorker, $payload['type'] ?? 'status', $payload['message'] ?? 'Mise à jour disponible');
-        @unlink($notificationFile);
+        broadcastNotification($wsWorker, $payload['type'] ?? 'status', $payload['message'] ?? 'Mise à jour');
+        
+        // On garde le fichier mais on sait qu'on l'a déjà traité grâce au timestamp
     });
 };
 
 // ============================================================
-// HANDLERS DES APIs
+// HANDLERS DES APIs (Si utilisé comme serveur standalone)
 // ============================================================
 
 function handleMatricules($connection, $queryString) {
     parse_str($queryString, $params);
-    
     try {
         $page = max(1, (int)($params['page'] ?? 1));
         $limit = min(200, max(10, (int)($params['limit'] ?? 50)));
@@ -153,17 +117,9 @@ function handleMatricules($connection, $queryString) {
             $stmt->execute([$limit, $offset]);
         }
         
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
         sendJson($connection, [
-            'data' => $rows,
-            'pagination' => [
-                'page' => $page,
-                'limit' => $limit,
-                'total' => $total,
-                'totalPages' => ceil($total / $limit),
-            ],
-            'search' => $search,
+            'data' => $stmt->fetchAll(PDO::FETCH_ASSOC),
+            'pagination' => ['page' => $page, 'limit' => $limit, 'total' => $total, 'totalPages' => ceil($total / $limit)]
         ]);
     } catch (Exception $e) {
         sendJson($connection, ['error' => $e->getMessage()], 500);
@@ -172,18 +128,13 @@ function handleMatricules($connection, $queryString) {
 
 function handleSousdossiers($connection, $queryString) {
     parse_str($queryString, $params);
-    $matriculeId = (int)($params['matricule_id'] ?? 0);
-    
-    if ($matriculeId <= 0) {
-        sendJson($connection, ['error' => 'matricule_id requis'], 400);
-        return;
-    }
+    $mid = (int)($params['matricule_id'] ?? 0);
+    if ($mid <= 0) return sendJson($connection, ['error' => 'ID requis'], 400);
     
     try {
         $db = getDB();
         $stmt = $db->prepare('SELECT id, nom, nb_images FROM sousdossiers WHERE matricule_id = ? ORDER BY nom');
-        $stmt->execute([$matriculeId]);
-        
+        $stmt->execute([$mid]);
         sendJson($connection, ['data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
     } catch (Exception $e) {
         sendJson($connection, ['error' => $e->getMessage()], 500);
@@ -192,99 +143,32 @@ function handleSousdossiers($connection, $queryString) {
 
 function handleImages($connection, $queryString) {
     parse_str($queryString, $params);
-    $sousDossierId = (int)($params['sousdossier_id'] ?? 0);
-    
-    if ($sousDossierId <= 0) {
-        sendJson($connection, ['error' => 'sousdossier_id requis'], 400);
-        return;
-    }
+    $sid = (int)($params['sousdossier_id'] ?? 0);
+    if ($sid <= 0) return sendJson($connection, ['error' => 'ID requis'], 400);
     
     try {
         $db = getDB();
-        $stmt = $db->prepare('SELECT id, nom_fichier, url FROM images WHERE sousdossier_id = ? ORDER BY nom_fichier');
-        $stmt->execute([$sousDossierId]);
+        $stmt = $db->prepare('SELECT id, nom_fichier FROM images WHERE sousdossier_id = ? ORDER BY nom_fichier');
+        $stmt->execute([$sid]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        sendJson($connection, ['data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        foreach ($rows as &$row) {
+            $row['url'] = 'app/image.php?id=' . $row['id'];
+        }
+        sendJson($connection, ['data' => $rows]);
     } catch (Exception $e) {
         sendJson($connection, ['error' => $e->getMessage()], 500);
     }
 }
 
-// ============================================================
-// UTILITAIRES HTTP
-// ============================================================
-
 function sendJson($connection, $data, $code = 200) {
     $json = json_encode($data);
-    
     $response = "HTTP/1.1 $code OK\r\n";
     $response .= "Content-Type: application/json; charset=utf-8\r\n";
     $response .= "Content-Length: " . strlen($json) . "\r\n";
-    $response .= "Cache-Control: public, max-age=30\r\n";
-    $response .= "Access-Control-Allow-Origin: *\r\n";
-    $response .= "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n";
-    $response .= "\r\n" . $json;
-    
+    $response .= "Access-Control-Allow-Origin: *\r\n\r\n" . $json;
     $connection->send($response);
 }
 
-function sendResponse($connection, $message, $code = 200) {
-    $response = "HTTP/1.1 $code\r\n";
-    $response .= "Content-Type: text/plain; charset=utf-8\r\n";
-    $response .= "Content-Length: " . strlen($message) . "\r\n";
-    $response .= "\r\n" . $message;
-    
-    $connection->send($response);
-}
-
-function serveStaticFile($connection, $file) {
-    if (!file_exists($file)) {
-        sendResponse($connection, 'Not Found', 404);
-        return;
-    }
-    
-    $content = file_get_contents($file);
-    $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-    
-    $mimeTypes = [
-        'html' => 'text/html; charset=utf-8',
-        'js' => 'application/javascript',
-        'css' => 'text/css',
-        'json' => 'application/json',
-        'png' => 'image/png',
-        'jpg' => 'image/jpeg',
-        'jpeg' => 'image/jpeg',
-        'gif' => 'image/gif',
-        'svg' => 'image/svg+xml',
-        'woff' => 'font/woff',
-        'woff2' => 'font/woff2',
-        'ttf' => 'font/ttf',
-        'ico' => 'image/x-icon',
-    ];
-    
-    $mime = $mimeTypes[$ext] ?? 'text/plain';
-    
-    $response = "HTTP/1.1 200 OK\r\n";
-    $response .= "Content-Type: $mime\r\n";
-    $response .= "Content-Length: " . strlen($content) . "\r\n";
-    $response .= ($ext === 'html' ? "Cache-Control: no-cache\r\n" : "Cache-Control: public, max-age=3600\r\n");
-    $response .= "\r\n";
-    
-    $connection->send($response . $content);
-}
-
-function isAllowedFile($file) {
-    $allowed = [
-        'jpg', 'jpeg', 'png', 'gif', 'svg', 'ico',
-        'js', 'css', 'woff', 'woff2', 'ttf', 'json',
-        'htm', 'html'
-    ];
-    $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-    return in_array($ext, $allowed);
-}
-
-// ============================================================
-// DÉMARRAGE
-// ============================================================
-
+// Lancement
 Worker::runAll();

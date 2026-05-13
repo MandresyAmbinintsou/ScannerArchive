@@ -1,14 +1,9 @@
 -- ============================================================
 -- SCHEMA PostgreSQL — Archive Viewer
--- Exécuter ce fichier en premier (exemple):
---   psql -U postgres -d archive_db -f schema.pg.sql
 -- ============================================================
 
--- Base de données (à créer selon votre setup)
--- CREATE DATABASE archive_db;
-
 -- Table des matricules
-CREATE TABLE IF NOT EXISTS matricules (
+CREATE TABLE matricules (
     id              BIGSERIAL PRIMARY KEY,
     nom             VARCHAR(150) NOT NULL UNIQUE,
     chemin          TEXT NOT NULL,
@@ -17,7 +12,7 @@ CREATE TABLE IF NOT EXISTS matricules (
 );
 
 -- Table des sous-dossiers
-CREATE TABLE IF NOT EXISTS sousdossiers (
+CREATE TABLE sousdossiers (
     id              BIGSERIAL PRIMARY KEY,
     matricule_id    BIGINT NOT NULL REFERENCES matricules(id) ON DELETE CASCADE,
     nom             VARCHAR(150) NOT NULL,
@@ -26,7 +21,7 @@ CREATE TABLE IF NOT EXISTS sousdossiers (
 );
 
 -- Table des images
-CREATE TABLE IF NOT EXISTS images (
+CREATE TABLE images (
     id              BIGSERIAL PRIMARY KEY,
     sousdossier_id  BIGINT NOT NULL REFERENCES sousdossiers(id) ON DELETE CASCADE,
     nom_fichier     VARCHAR(255) NOT NULL,
@@ -34,7 +29,7 @@ CREATE TABLE IF NOT EXISTS images (
 );
 
 -- Table d'historique des dossiers scannés
-CREATE TABLE IF NOT EXISTS scan_history (
+CREATE TABLE scan_history (
     id          BIGSERIAL PRIMARY KEY,
     root_path   TEXT NOT NULL,
     root_mtime  BIGINT DEFAULT 0,
@@ -42,7 +37,7 @@ CREATE TABLE IF NOT EXISTS scan_history (
 );
 
 -- Table des utilisateurs
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE users (
     id              BIGSERIAL PRIMARY KEY,
     username        VARCHAR(150) NOT NULL UNIQUE,
     password_hash   TEXT NOT NULL,
@@ -52,12 +47,6 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- Index performance
-CREATE INDEX IF NOT EXISTS idx_mat_nom ON matricules(nom);
-CREATE INDEX IF NOT EXISTS idx_sous_mat_id ON sousdossiers(matricule_id);
-CREATE INDEX IF NOT EXISTS idx_img_sous_id ON images(sousdossier_id);
-
--- Recherche “contains” efficace sur nom (optionnel)
--- Nécessite: CREATE EXTENSION pg_trgm;
--- CREATE EXTENSION IF NOT EXISTS pg_trgm;
--- CREATE INDEX IF NOT EXISTS idx_mat_nom_trgm ON matricules USING gin (nom gin_trgm_ops);
-
+CREATE INDEX idx_mat_nom ON matricules(nom);
+CREATE INDEX idx_sous_mat_id ON sousdossiers(matricule_id);
+CREATE INDEX idx_img_sous_id ON images(sousdossier_id);

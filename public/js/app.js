@@ -7,6 +7,7 @@ const API = {
     matricules: `${BASE}app/matricules.php`,
     sousdossiers: `${BASE}app/sousdossiers.php`,
     images: `${BASE}app/images.php`,
+    folder: `${BASE}app/folder.php`,
     refresh: `${BASE}app/refresh.php`,
 };
 
@@ -23,6 +24,7 @@ const state = {
     isLoading: false,
     isSplitView: false,
     hasMore: true,
+    folderStack: [],
 };
 
 const els = {
@@ -39,6 +41,9 @@ const els = {
     detailContent:  document.getElementById('detailContent'),
     detailTitle:    document.getElementById('detailTitle'),
     sousdossierGrid:document.getElementById('sousdossierGrid'),
+    folderBar:      document.getElementById('folderBar'),
+    folderPath:     document.getElementById('folderPath'),
+    btnFolderBackTop:document.getElementById('btnFolderBackTop'),
     galerieSection: document.getElementById('galerieSection'),
     galerieTitle:   document.getElementById('galerieTitle'),
     galerieGrid:    document.getElementById('galerieGrid'),
@@ -322,6 +327,7 @@ async function selectMatricule(id, nom, clickedEl = null) {
     
     // 5. Charger les données
     els.galerieSection.classList.add('hidden');
+    state.folderStack = ['.'];
     els.sousdossierGrid.innerHTML = `
         <div class="col-span-full py-32 text-center">
             <div class="inline-flex h-16 w-16 items-center justify-center rounded-full border-4 border-indigo-600/20 border-t-indigo-600 animate-spin mb-6"></div>
@@ -331,37 +337,114 @@ async function selectMatricule(id, nom, clickedEl = null) {
     els.galerieSection.classList.add('hidden');
 
     try {
-        const data = await apiFetch(API.sousdossiers, { matricule_id: id });
-        const rows = data.data;
-
-        if (rows.length === 0) {
-            els.sousdossierGrid.innerHTML = `
-                <div class="col-span-full py-20 text-center rounded-3xl border-2 border-dashed border-slate-200 dark:border-white/5">
-                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Aucun sous-dossier trouvé</p>
-                </div>
-            `;
-            return;
-        }
-
-        // Sous-dossiers miniaturisés
-        els.sousdossierGrid.innerHTML = rows.map(s => `
-            <button type="button" class="sous-card group relative flex flex-col items-center justify-center rounded-2xl border border-slate-200 dark:border-white/5 bg-white dark:bg-slate-800 p-5 text-center transition-all duration-500 hover:border-indigo-600 hover:shadow-xl hover:-translate-y-1" data-id="${s.id}" data-nom="${escapeHtml(s.nom)}">
-                <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-900 text-indigo-500 transition-all duration-500 group-hover:bg-indigo-600 group-hover:text-white group-hover:rotate-6">
-                    <i class="fas fa-folder-open text-lg"></i>
-                </div>
-                <div class="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tight truncate w-full px-1">${escapeHtml(s.nom)}</div>
-                <div class="mt-2 text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest italic">${s.nb_images} Images</div>
-            </button>
-        `).join('');
-
-        els.sousdossierGrid.querySelectorAll('.sous-card').forEach(card => {
-            card.addEventListener('click', () => loadGalerie(parseInt(card.dataset.id), card.dataset.nom));
-        });
+        await renderExplorerLevel('.');
 
     } catch (err) {
         console.error('Erreur Sous-dossiers:', err);
         els.sousdossierGrid.innerHTML = `<div class="col-span-full py-10 text-center text-red-500 font-black uppercase text-[10px] border border-red-100 rounded-2xl bg-red-50/50">Erreur de chargement des données</div>`;
     }
+}
+
+function updateFolderBar() {
+    const stack = Array.isArray(state.folderStack) ? state.folderStack : ['.'];
+    const current = stack[stack.length - 1] || '.';
+    const canBack = stack.length > 1;
+
+    if (els.folderBar) els.folderBar.classList.remove('hidden');
+    if (els.btnFolderBackTop) els.btnFolderBackTop.disabled = !canBack;
+    if (els.btnFolderBackTop) els.btnFolderBackTop.classList.toggle('opacity-50', !canBack);
+    if (els.folderPath) {
+        const parts = current === '.' ? [] : current.split('/').filter(Boolean);
+        let cumulative = '';
+        const crumbs = parts.map(p => {
+            cumulative = cumulative ? `${cumulative}/${p}` : p;
+            return { label: p, nom: cumulative };
+        });
+
+        const rootBtn = `<button type="button" class="crumb hover:text-indigo-500 transition" data-nom="." title="/">/</button>`;
+        const sep = `<span class="mx-2 text-slate-300 dark:text-slate-700">/</span>`;
+
+        const crumbHtml = crumbs.map(c => (
+            `<button type="button" class="crumb hover:text-indigo-500 transition" data-nom="${escapeHtml(c.nom)}" title="${escapeHtml(c.nom)}">${escapeHtml(c.label)}</button>`
+        )).join(sep);
+
+        els.folderPath.innerHTML = crumbs.length ? `${rootBtn}${sep}${crumbHtml}` : rootBtn;
+    }
+}
+
+async function renderExplorerLevel(levelNom) {
+    const mid = state.currentMatricule?.id;
+    if (!mid) return;
+
+    const nom = (levelNom || '.').trim() || '.';
+    updateFolderBar();
+
+    els.sousdossierGrid.innerHTML = `
+        <div class="col-span-full py-16 text-center">
+            <i class="fas fa-circle-notch animate-spin text-indigo-600 text-3xl mb-4"></i>
+            <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Chargement...</p>
+        </div>
+    `;
+
+    const data = await apiFetch(API.folder, { matricule_id: mid, nom: nom, page: 1, limit: 200 });
+    const folders = Array.isArray(data.folders) ? data.folders : [];
+    const images = Array.isArray(data.images) ? data.images : [];
+
+    if (folders.length === 0 && images.length === 0) {
+        els.sousdossierGrid.innerHTML = `
+            <div class="col-span-full py-20 text-center rounded-3xl border-2 border-dashed border-slate-200 dark:border-white/5">
+                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Dossier vide</p>
+            </div>
+        `;
+        return;
+    }
+
+    const filesHtml = images.map(img => {
+        const name = img.nom_fichier || '';
+        const isPdf = name.toLowerCase().endsWith('.pdf');
+        const icon = isPdf ? '<div class="absolute inset-0 flex items-center justify-center text-red-500 bg-slate-900/50"><i class="fas fa-file-pdf text-2xl"></i></div>' : '';
+        return `
+            <button type="button" class="explorer-file group relative aspect-square overflow-hidden rounded-xl bg-slate-900/60 shadow-lg border border-white/10" data-id="${img.id}" data-url="${img.url}" data-nom="${escapeHtml(name)}">
+                ${isPdf ? icon : `<img class="h-full w-full object-cover transition duration-700 group-hover:scale-110 opacity-90" src="${img.url}" alt="${escapeHtml(name)}" loading="lazy">`}
+                <div class="absolute inset-0 bg-indigo-600/10 opacity-0 group-hover:opacity-100 transition duration-500"></div>
+            </button>
+        `;
+    }).join('');
+
+    const foldersHtml = folders.map(f => {
+        const label = f.label || f.nom || '';
+        const previewUrl = f.preview_url || '';
+        const hasPreview = typeof previewUrl === 'string' && previewUrl.length > 0;
+        return `
+            <button type="button" class="explorer-folder group relative flex flex-col items-center justify-center rounded-2xl border border-slate-200 dark:border-white/5 bg-white dark:bg-slate-800 p-4 text-center transition-all duration-500 hover:border-indigo-600 hover:shadow-xl hover:-translate-y-1 overflow-hidden" data-nom="${escapeHtml(f.nom)}">
+                ${hasPreview ? `
+                    <img class="absolute inset-0 h-full w-full object-cover opacity-20 group-hover:opacity-30 transition duration-500" src="${previewUrl}" alt="" loading="lazy">
+                    <div class="absolute inset-0 bg-gradient-to-b from-slate-900/40 via-slate-900/20 to-slate-900/70"></div>
+                ` : ''}
+                <div class="relative z-10 mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-50/90 dark:bg-slate-900/90 text-indigo-500 transition-all duration-500 group-hover:bg-indigo-600 group-hover:text-white group-hover:rotate-6 border border-slate-200/70 dark:border-white/10">
+                    <i class="fas fa-folder-open text-lg"></i>
+                </div>
+                <div class="relative z-10 text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tight truncate w-full px-1">${escapeHtml(label)}</div>
+                <div class="relative z-10 mt-2 text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest italic">${Number(f.nb_images) || 0} fichiers</div>
+            </button>
+        `;
+    }).join('');
+
+    els.sousdossierGrid.innerHTML = filesHtml + foldersHtml;
+
+    els.sousdossierGrid.querySelectorAll('.explorer-file').forEach(card => {
+        card.onclick = () => openLightbox(card.dataset.id, card.dataset.url, card.dataset.nom);
+    });
+    els.sousdossierGrid.querySelectorAll('.explorer-folder').forEach(card => {
+        card.onclick = () => openFolder(card.dataset.nom || '');
+    });
+}
+
+async function openFolder(folderNom) {
+    const nom = (folderNom || '.').trim() || '.';
+    state.folderStack.push(nom);
+    updateFolderBar();
+    await renderExplorerLevel(nom);
 }
 
 /**
@@ -392,6 +475,8 @@ async function loadGalerie(sousDossierId, nom, append = false) {
         const { data: rows, pagination } = data;
         state.galerieHasMore = state.galeriePage < pagination.totalPages;
 
+        if (!append) els.galerieTitle.textContent = nom === '.' ? 'Racine' : nom;
+
         const loader = document.getElementById('galerieLoader');
         if (loader) loader.remove();
         
@@ -403,17 +488,21 @@ async function loadGalerie(sousDossierId, nom, append = false) {
             return;
         }
 
-        const html = rows.map(img => `
-            <button type="button" class="img-card group relative aspect-square overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-900 shadow-lg border border-white/5" data-url="${img.url}" data-nom="${escapeHtml(img.nom_fichier)}">
-                <img class="h-full w-full object-cover transition duration-700 group-hover:scale-110 opacity-80 dark:opacity-50 group-hover:opacity-100" src="${img.url}" alt="${escapeHtml(img.nom_fichier)}" loading="lazy">
-                <div class="absolute inset-0 bg-indigo-600/10 opacity-0 group-hover:opacity-100 transition duration-500"></div>
-            </button>
-        `).join('');
+        const imagesHtml = rows.map(img => {
+            const isPdf = img.nom_fichier.toLowerCase().endsWith('.pdf');
+            const icon = isPdf ? '<div class="absolute inset-0 flex items-center justify-center text-red-500 bg-slate-900/50"><i class="fas fa-file-pdf text-3xl"></i></div>' : '';
+            return `
+                <button type="button" class="img-card group relative aspect-square overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-900 shadow-lg border border-white/5" data-id="${img.id}" data-url="${img.url}" data-nom="${escapeHtml(img.nom_fichier)}">
+                    ${isPdf ? icon : `<img class="h-full w-full object-cover transition duration-700 group-hover:scale-110 opacity-80 dark:opacity-50 group-hover:opacity-100" src="${img.url}" alt="${escapeHtml(img.nom_fichier)}" loading="lazy">`}
+                    <div class="absolute inset-0 bg-indigo-600/10 opacity-0 group-hover:opacity-100 transition duration-500"></div>
+                </button>
+            `;
+        }).join('');
 
         if (append) {
-            els.galerieGrid.insertAdjacentHTML('beforeend', html);
+            els.galerieGrid.insertAdjacentHTML('beforeend', imagesHtml);
         } else {
-            els.galerieGrid.innerHTML = html;
+            els.galerieGrid.innerHTML = imagesHtml;
         }
 
         // Ajouter bouton "Voir plus" si nécessaire
@@ -434,7 +523,7 @@ async function loadGalerie(sousDossierId, nom, append = false) {
         }
 
         els.galerieGrid.querySelectorAll('.img-card').forEach(card => {
-            card.onclick = () => openLightbox(card.dataset.url, card.dataset.nom);
+            card.onclick = () => openLightbox(card.dataset.id, card.dataset.url, card.dataset.nom);
         });
 
     } catch (err) {
@@ -443,12 +532,34 @@ async function loadGalerie(sousDossierId, nom, append = false) {
     }
 }
 
-function openLightbox(url, nom) {
-    els.lightboxImg.src = url;
-    els.lightboxCaption.textContent = nom;
-    if (els.lightboxPrint) {
-        els.lightboxPrint.href = `${BASE}app/print_pdf.php?url=${encodeURIComponent(url)}`;
+function openLightbox(id, url, nom) {
+    const isPdf = nom.toLowerCase().endsWith('.pdf');
+    const lightboxContainer = els.lightboxImg.parentNode;
+    
+    // Nettoyer le contenu précédent (supprimer iframe si elle existe)
+    const oldIframe = lightboxContainer.querySelector('iframe');
+    if (oldIframe) oldIframe.remove();
+    els.lightboxImg.classList.remove('hidden');
+
+    if (isPdf) {
+        els.lightboxImg.classList.add('hidden');
+        const iframe = document.createElement('iframe');
+        iframe.src = url;
+        iframe.className = 'w-full h-[80vh] rounded-3xl shadow-2xl border border-white/10';
+        lightboxContainer.insertBefore(iframe, els.lightboxCaption);
+        
+        // Cacher le bouton "Imprimer PDF" (conversion) car c'est déjà un PDF
+        if (els.lightboxPrint) els.lightboxPrint.classList.add('hidden');
+    } else {
+        els.lightboxImg.src = url;
+        els.lightboxImg.classList.remove('hidden');
+        if (els.lightboxPrint) {
+            els.lightboxPrint.href = `${BASE}app/print_pdf.php?id=${id}`;
+            els.lightboxPrint.classList.remove('hidden');
+        }
     }
+
+    els.lightboxCaption.textContent = nom;
     els.lightbox.classList.remove('hidden');
     els.lightbox.classList.add('flex');
     document.body.style.overflow = 'hidden';
@@ -457,6 +568,11 @@ function closeLightbox() {
     els.lightbox.classList.add('hidden');
     els.lightbox.classList.remove('flex');
     els.lightboxImg.src = '';
+    
+    // Supprimer l'iframe PDF si elle existe
+    const iframe = els.lightboxImg.parentNode.querySelector('iframe');
+    if (iframe) iframe.remove();
+    
     document.body.style.overflow = '';
 }
 
@@ -484,6 +600,37 @@ els.btnBack?.addEventListener('click', () => {
 });
 els.btnCloseGalerie?.addEventListener('click', () => {
     els.galerieSection.classList.add('hidden');
+});
+
+els.btnFolderBackTop?.addEventListener('click', async () => {
+    if (!Array.isArray(state.folderStack) || state.folderStack.length <= 1) return;
+    state.folderStack.pop();
+    updateFolderBar();
+    const prev = state.folderStack[state.folderStack.length - 1] || '.';
+    await renderExplorerLevel(prev);
+});
+
+els.folderPath?.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.crumb');
+    if (!btn) return;
+    const targetNom = (btn.dataset.nom || '.').trim() || '.';
+
+    // Reconstruire la pile pour garder le bouton Retour cohérent
+    if (targetNom === '.') {
+        state.folderStack = ['.'];
+    } else {
+        const parts = targetNom.split('/').filter(Boolean);
+        let cumulative = '';
+        const stack = ['.'];
+        for (const p of parts) {
+            cumulative = cumulative ? `${cumulative}/${p}` : p;
+            stack.push(cumulative);
+        }
+        state.folderStack = stack;
+    }
+
+    updateFolderBar();
+    await renderExplorerLevel(targetNom);
 });
 
 els.lightboxClose?.addEventListener('click', closeLightbox);

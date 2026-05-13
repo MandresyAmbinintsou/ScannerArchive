@@ -1,10 +1,12 @@
 <?php
 // ============================================================
-// public/image.php — Sert une image depuis le disque local
-// Appel : /public/image.php?id=123
+// app/image.php — Sert une image depuis le disque local
 // ============================================================
 
+require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/../config/database.php';
+
+ensureSessionStarted();
 
 try {
     $imageId = (int)($_GET['id'] ?? 0);
@@ -29,10 +31,16 @@ try {
     exit($e->getMessage());
 }
 
-// Sécurité : vérifier que le chemin est bien dans ARCHIVE_ROOT
-if (strpos(realpath($path), realpath(ARCHIVE_ROOT)) !== 0) {
+// Sécurité : vérifier que le chemin est autorisé
+// On utilise le root en session s'il existe, sinon la constante
+$allowedRoot = $_SESSION['archive_root'] ?? ARCHIVE_ROOT;
+$realPath = realpath($path);
+$realAllowed = realpath($allowedRoot);
+
+// Sur Windows, on utilise stripos car les chemins sont insensibles à la casse
+if ($realPath === false || $realAllowed === false || stripos($realPath, $realAllowed) !== 0) {
     http_response_code(403);
-    exit('Accès refusé');
+    exit('Accès refusé ou fichier hors limite');
 }
 
 if (!file_exists($path)) {
@@ -48,12 +56,15 @@ $mimeMap  = [
     'jpeg' => 'image/jpeg',
     'gif'  => 'image/gif',
     'webp' => 'image/webp',
+    'pdf'  => 'application/pdf',
 ];
 $mime = $mimeMap[$ext] ?? 'application/octet-stream';
 
-// Cache navigateur (1 heure)
+// Désactiver le cache pour éviter de voir d'anciennes images après une ré-indexation
 header('Content-Type: ' . $mime);
-header('Cache-Control: public, max-age=3600');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Cache-Control: post-check=0, pre-check=0', false);
+header('Pragma: no-cache');
 header('Content-Length: ' . filesize($path));
 
 readfile($path);

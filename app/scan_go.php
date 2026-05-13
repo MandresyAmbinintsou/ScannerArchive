@@ -61,8 +61,10 @@ function scanArchiveGo(PDO $db, string $archiveRoot, ?string $scannerPath = null
 
     $stmtImg = $db->prepare('INSERT INTO images (sousdossier_id, nom_fichier, chemin_complet) VALUES (?, ?, ?)');
 
+    $command = sprintf('%s --root %s --emit-images', escapeshellarg($scanner), escapeshellarg($archiveRoot));
+
     $proc = proc_open(
-        [$scanner, '--root', $archiveRoot, '--emit-images'],
+        $command,
         [
             0 => ['pipe', 'r'],
             1 => ['pipe', 'w'],
@@ -119,11 +121,16 @@ function scanArchiveGo(PDO $db, string $archiveRoot, ?string $scannerPath = null
                 $sousCount = (int)($m['sous_count'] ?? 0);
                 if ($name === '' || $path === '') { $warnings++; continue; }
 
-                $matIdByName[$name] = insertAndGetId(
-                    $db,
-                    'INSERT INTO matricules (nom, chemin, nb_sousdossiers) VALUES (?, ?, ?)',
-                    [$name, $path, $sousCount]
+                // Tolérer les doublons : si le matricule existe déjà, on met à jour et on récupère son id.
+                $stmtUpsertMat = $db->prepare(
+                    'INSERT INTO matricules (nom, chemin, nb_sousdossiers)
+                     VALUES (?, ?, ?)
+                     ON CONFLICT (nom)
+                     DO UPDATE SET chemin = EXCLUDED.chemin, nb_sousdossiers = EXCLUDED.nb_sousdossiers, indexe_le = CURRENT_TIMESTAMP
+                     RETURNING id'
                 );
+                $stmtUpsertMat->execute([$name, $path, $sousCount]);
+                $matIdByName[$name] = (int)$stmtUpsertMat->fetchColumn();
                 $totalMat++;
                 continue;
             }

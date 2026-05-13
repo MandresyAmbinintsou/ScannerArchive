@@ -7,10 +7,12 @@ define('DB_HOST', getenv('DB_HOST') ?: getenv('PGHOST') ?: '');
 define('DB_PORT', getenv('DB_PORT') ?: getenv('PGPORT') ?: '5432');
 define('DB_NAME', getenv('DB_NAME') ?: 'archive_db');
 
+$isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+
 $defaultDbUser = getenv('DB_USER') ?: getenv('PGUSER');
 if ($defaultDbUser === false || $defaultDbUser === '') {
     // Under Windows, the environment username often does not match a PostgreSQL role.
-    if (PHP_OS_FAMILY === 'Windows') {
+    if ($isWindows) {
         $defaultDbUser = 'postgres';
     } else {
         $defaultDbUser = getenv('USER') ?: getenv('LOGNAME') ?: get_current_user();
@@ -23,7 +25,7 @@ define('DB_PASS', $pgpass !== false ? $pgpass : '');
 
 $defaultArchiveRoot = getenv('ARCHIVE_ROOT');
 if (!$defaultArchiveRoot) {
-    if (PHP_OS_FAMILY === 'Windows') {
+    if ($isWindows) {
         $defaultArchiveRoot = getenv('USERPROFILE') ? getenv('USERPROFILE') . '\\archive' : 'C:\\archive';
     } else {
         $defaultArchiveRoot = getenv('HOME') ? getenv('HOME') . '/archive' : '/data/archive';

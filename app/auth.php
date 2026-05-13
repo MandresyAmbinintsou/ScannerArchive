@@ -5,14 +5,26 @@ require_once __DIR__ . '/../config/database.php';
 function ensureSessionStarted(): void {
     if (session_status() === PHP_SESSION_NONE) {
         $cookieParams = session_get_cookie_params();
-        session_set_cookie_params([
-            'lifetime' => 0,
-            'path' => $cookieParams['path'] ?: '/',
-            'domain' => $cookieParams['domain'] ?: '',
-            'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
-            'httponly' => true,
-            'samesite' => 'Lax',
-        ]);
+        $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+        // Signature compatible PHP 5.x, 7.x et 8.x
+        if (version_compare(PHP_VERSION, '7.3.0', '>=')) {
+            session_set_cookie_params([
+                'lifetime' => 0,
+                'path' => $cookieParams['path'] ?: '/',
+                'domain' => $cookieParams['domain'] ?: '',
+                'secure' => $secure,
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ]);
+        } else {
+            session_set_cookie_params(
+                0,
+                ($cookieParams['path'] ?: '/') . '; samesite=Lax',
+                $cookieParams['domain'] ?: '',
+                $secure,
+                true
+            );
+        }
         session_start();
     }
 }

@@ -63,6 +63,12 @@ require_once 'app/header.php';
                 </div>
 
                 <!-- Grille des Sous-dossiers -->
+                <div id="folderBar" class="hidden items-center justify-between gap-4 rounded-2xl bg-white/70 dark:bg-slate-900/40 border border-slate-200 dark:border-white/5 px-5 py-4">
+                    <button id="btnFolderBackTop" class="rounded-xl bg-slate-900 px-5 py-3 text-[9px] font-black uppercase tracking-widest text-white hover:bg-indigo-600 transition">
+                        <i class="fas fa-arrow-left mr-2"></i> Retour
+                    </button>
+                    <div id="folderPath" class="flex-1 text-right text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 truncate"></div>
+                </div>
                 <div id="sousdossierGrid" class="grid gap-3 grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"></div>
 
                 <!-- Galerie -->
@@ -75,6 +81,12 @@ require_once 'app/header.php';
                         <button id="btnCloseGalerie" class="h-10 w-10 rounded-full bg-slate-800 text-white hover:bg-red-500 transition border border-white/5">
                             <i class="fas fa-times text-xs"></i>
                         </button>
+                    </div>
+                    <div class="mb-6 flex items-center justify-between">
+                        <button id="btnFolderBack" class="hidden rounded-xl bg-slate-800 border border-white/10 px-5 py-3 text-[9px] font-black uppercase tracking-widest text-indigo-300 hover:bg-slate-700 transition">
+                            <i class="fas fa-arrow-left mr-2"></i> Retour
+                        </button>
+                        <div></div>
                     </div>
                     <div id="galerieGrid" class="grid gap-2 grid-cols-4 md:grid-cols-6 lg:grid-cols-8"></div>
                 </div>

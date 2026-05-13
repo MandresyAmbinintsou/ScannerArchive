@@ -18,12 +18,12 @@ try {
 // PostgreSQL: pas de query_cache_type
 
     if ($search !== '') {
-        // Utilisez LIKE simple si la collation est déjà insensible à la casse
-        $countSql = 'SELECT COUNT(*) FROM matricules WHERE nom LIKE ?';
+        // ILIKE est spécifique à PostgreSQL et permet une recherche insensible à la casse
+        $countSql = 'SELECT COUNT(*) FROM matricules WHERE nom ILIKE ?';
         $dataSql  = '
             SELECT id, nom, nb_sousdossiers
             FROM matricules
-            WHERE nom LIKE ?
+            WHERE nom ILIKE ?
             ORDER BY nom
             LIMIT ? OFFSET ?
         ';
