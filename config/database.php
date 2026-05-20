@@ -119,8 +119,42 @@ function ensureSchema(PDO $pdo): void {
                 password_hash TEXT NOT NULL,
                 password_plain TEXT NULL,
                 role VARCHAR(20) NOT NULL DEFAULT 'user',
+                is_approved BOOLEAN NOT NULL DEFAULT TRUE,
+                approved_at TIMESTAMPTZ NULL,
                 created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
             )"
         );
+    }
+
+    // Migrations légères (ajout de colonnes si absent).
+    // 1) is_approved
+    $stmtCol = $pdo->prepare("
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'users' AND column_name = :col
+        LIMIT 1
+    ");
+    $stmtCol->execute([':col' => 'is_approved']);
+    if (!$stmtCol->fetchColumn()) {
+        $pdo->exec("ALTER TABLE users ADD COLUMN is_approved BOOLEAN NOT NULL DEFAULT TRUE");
+        // Les comptes existants restent approuvés.
+        $pdo->exec("UPDATE users SET is_approved = TRUE WHERE is_approved IS NULL");
+    }
+
+    // 2) approved_at
+    $stmtCol->execute([':col' => 'approved_at']);
+    if (!$stmtCol->fetchColumn()) {
+        $pdo->exec("ALTER TABLE users ADD COLUMN approved_at TIMESTAMPTZ NULL");
+    }
+
+    // 3) access_level (0=superadmin, 1=admin, 2=répertoire)
+    $stmtCol->execute([':col' => 'access_level']);
+    if (!$stmtCol->fetchColumn()) {
+        $pdo->exec("ALTER TABLE users ADD COLUMN access_level SMALLINT NULL");
+        // Compatibilité : les anciens admins restent "total" (0), les users restent 2.
+        $pdo->exec("UPDATE users SET access_level = 0 WHERE (role = 'admin') AND (access_level IS NULL)");
+        $pdo->exec("UPDATE users SET access_level = 2 WHERE (role <> 'admin' OR role IS NULL) AND (access_level IS NULL)");
+        $pdo->exec("ALTER TABLE users ALTER COLUMN access_level SET DEFAULT 2");
+        $pdo->exec("ALTER TABLE users ALTER COLUMN access_level SET NOT NULL");
     }
 }

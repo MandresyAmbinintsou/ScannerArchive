@@ -1,0 +1,26 @@
+GUIDE DE DÉPANNAGE 403 FORBIDDEN (WAMP/WINDOWS 8)
+===================================================
+
+Si vous avez toujours une erreur 403 sur le PC2 :
+
+1. MODE "PUT ONLINE" (Anciens WAMP) :
+   - Cliquez sur l'icône WAMP dans la barre des tâches.
+   - Cherchez l'option "Put Online" (Passer en ligne).
+   - Si elle existe, cliquez dessus. Cela change automatiquement les permissions.
+
+2. CONFLIT D'IP :
+   - Vérifiez que le PC2 est bien sur le même réseau (192.168.10.x).
+   - Essayez de faire un 'ping 192.168.10.3' depuis le PC2.
+
+3. CHEMINS DANS VHOSTS :
+   - Dans 'apache_vhost_wamp.conf' que j'ai créé, vérifiez que 'DocumentRoot' 
+     pointe exactement vers votre dossier.
+   - Utilisez des slashs '/' et non des antislashs '\' dans les fichiers de config Apache.
+
+4. ANTIVIRUS :
+   - Certains antivirus (comme Avast ou Norton) bloquent le port 80 même si le 
+     pare-feu Windows est ouvert. Désactivez-les 5 minutes pour tester.
+
+5. PORT 80 OCCUPÉ :
+   - Sur PC1, vérifiez si Skype ou une autre application utilise le port 80.
+   - WAMP > Apache > Service > Test Port 80.

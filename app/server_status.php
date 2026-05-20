@@ -45,7 +45,33 @@ $memory = round(memory_get_usage() / 1024 / 1024, 2) . " MB";
         <p class="mt-2 text-[10px] font-black uppercase tracking-[0.4em] text-indigo-500">Diagnostic en temps réel</p>
     </div>
 
-    <div class="grid gap-8 md:grid-cols-3">
+    <div class="grid gap-8 md:grid-cols-4">
+        <!-- Carte Utilisateurs Actifs -->
+        <div class="rounded-3xl bg-white dark:bg-slate-800 p-8 shadow-xl border border-slate-100 dark:border-white/5">
+            <div class="flex items-center justify-between mb-6">
+                <div class="h-12 w-12 rounded-2xl bg-sky-500/10 text-sky-500 flex items-center justify-center">
+                    <i class="fas fa-users text-xl"></i>
+                </div>
+            </div>
+            <h3 class="text-xs font-black uppercase text-slate-400 mb-2">Utilisateurs</h3>
+            <p class="text-xl font-black text-slate-900 dark:text-white uppercase">
+                <?php 
+                $sessionPath = 'C:\xampp\tmp';
+                $sessionFiles = glob($sessionPath . '\sess_*');
+                $activeSessions = 0;
+                $now = time();
+                foreach ($sessionFiles as $file) {
+                    // Compter comme active si modifiée dans les 30 dernières minutes (1800 secondes)
+                    if (is_file($file) && ($now - filemtime($file) < 1800)) {
+                        $activeSessions++;
+                    }
+                }
+                echo $activeSessions;
+                ?>
+            </p>
+            <p class="mt-4 text-[9px] font-bold text-slate-500 uppercase">Sessions actives</p>
+        </div>
+
         <!-- Carte Workerman -->
         <div class="rounded-3xl bg-white dark:bg-slate-800 p-8 shadow-xl border border-slate-100 dark:border-white/5">
             <div class="flex items-center justify-between mb-6">

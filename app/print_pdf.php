@@ -7,6 +7,8 @@
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/../config/database.php';
 ensureSessionStarted();
+ini_set('display_errors', '0');
+error_reporting(E_ALL);
 
 // On peut passer soit un ID (préféré), soit une URL (ancien système)
 $imageId = (int)($_GET['id'] ?? 0);
@@ -48,7 +50,12 @@ $allowedRoot = $_SESSION['archive_root'] ?? ARCHIVE_ROOT;
 $realPath = realpath($localPath);
 $realAllowed = realpath($allowedRoot);
 
-if ($realPath === false || $realAllowed === false || strpos($realPath, $realAllowed) !== 0) {
+// Sur Windows, chemins insensibles à la casse.
+$startsWithAllowed = (PHP_OS_FAMILY === 'Windows')
+    ? ($realPath !== false && $realAllowed !== false && stripos($realPath, $realAllowed) === 0)
+    : ($realPath !== false && $realAllowed !== false && strpos($realPath, $realAllowed) === 0);
+
+if (!$startsWithAllowed) {
     die("Accès refusé : le fichier est en dehors du répertoire autorisé.");
 }
 

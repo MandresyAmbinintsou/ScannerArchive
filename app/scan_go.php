@@ -121,16 +121,24 @@ function scanArchiveGo(PDO $db, string $archiveRoot, ?string $scannerPath = null
                 $sousCount = (int)($m['sous_count'] ?? 0);
                 if ($name === '' || $path === '') { $warnings++; continue; }
 
-                // Tolérer les doublons : si le matricule existe déjà, on met à jour et on récupère son id.
-                $stmtUpsertMat = $db->prepare(
-                    'INSERT INTO matricules (nom, chemin, nb_sousdossiers)
-                     VALUES (?, ?, ?)
-                     ON CONFLICT (nom)
-                     DO UPDATE SET chemin = EXCLUDED.chemin, nb_sousdossiers = EXCLUDED.nb_sousdossiers, indexe_le = CURRENT_TIMESTAMP
-                     RETURNING id'
-                );
-                $stmtUpsertMat->execute([$name, $path, $sousCount]);
-                $matIdByName[$name] = (int)$stmtUpsertMat->fetchColumn();
+                // NOTE compat: ON CONFLICT nécessite PostgreSQL >= 9.5.
+                // Ici on TRUNCATE au début du scan, donc un simple INSERT suffit.
+                // En cas de doublon inattendu, fallback sur un SELECT.
+                try {
+                    $matIdByName[$name] = insertAndGetId(
+                        $db,
+                        'INSERT INTO matricules (nom, chemin, nb_sousdossiers) VALUES (?, ?, ?)',
+                        [$name, $path, $sousCount]
+                    );
+                } catch (PDOException $e) {
+                    $stmtSel = $db->prepare('SELECT id FROM matricules WHERE nom = ? LIMIT 1');
+                    $stmtSel->execute([$name]);
+                    $existing = (int)$stmtSel->fetchColumn();
+                    if ($existing <= 0) {
+                        throw $e;
+                    }
+                    $matIdByName[$name] = $existing;
+                }
                 $totalMat++;
                 continue;
             }

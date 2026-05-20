@@ -21,7 +21,7 @@ require_once 'app/header.php';
     <!-- Layout Master-Detail -->
     <div id="layoutWrapper" class="flex flex-col gap-12 transition-none">
         
-        <!-- Colonne GAUCHE : Répertoire -->
+        <!-- Colonne UNIQUE : Répertoire -->
         <aside id="sidebarList" class="w-full max-w-3xl mx-auto transition-all duration-500 ease-in-out">
             <div class="flex items-center justify-between mb-8 px-6">
                 <div>
@@ -43,56 +43,52 @@ require_once 'app/header.php';
 
             <div id="pagination" class="mt-12 flex justify-center gap-2"></div>
         </aside>
-
-        <!-- Colonne DROITE : Détails -->
-        <section id="detailView" class="hidden flex-1 animate-in fade-in slide-in-from-right-12 duration-700">
-            <div id="detailContent" class="md:sticky md:top-24 md:h-[calc(100vh-120px)] md:overflow-y-auto space-y-10 pr-4 scrollbar-thin">
-                <!-- En-tête -->
-                <div class="rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/5 p-10 shadow-2xl">
-                    <div class="flex items-center justify-between mb-8">
-                        <button id="btnBack" class="group flex items-center gap-3 rounded-xl bg-slate-900 px-6 py-3 text-[10px] font-black uppercase text-white hover:bg-indigo-600 transition shadow-2xl">
-                            <i class="fas fa-arrow-left transition group-hover:-translate-x-1"></i> Retour Liste
-                        </button>
-                        <div class="flex gap-2">
-                            <div class="h-1.5 w-1.5 rounded-full bg-slate-300 dark:bg-slate-600"></div>
-                            <div class="h-1.5 w-1.5 rounded-full bg-slate-300 dark:bg-slate-600"></div>
-                            <div class="h-1.5 w-1.5 rounded-full bg-indigo-500"></div>
-                        </div>
-                    </div>
-                    <h2 id="detailTitle" class="text-5xl font-black text-slate-900 dark:text-white tracking-tighter uppercase leading-none italic"></h2>
-                </div>
-
-                <!-- Grille des Sous-dossiers -->
-                <div id="folderBar" class="hidden items-center justify-between gap-4 rounded-2xl bg-white/70 dark:bg-slate-900/40 border border-slate-200 dark:border-white/5 px-5 py-4">
-                    <button id="btnFolderBackTop" class="rounded-xl bg-slate-900 px-5 py-3 text-[9px] font-black uppercase tracking-widest text-white hover:bg-indigo-600 transition">
-                        <i class="fas fa-arrow-left mr-2"></i> Retour
-                    </button>
-                    <div id="folderPath" class="flex-1 text-right text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 truncate"></div>
-                </div>
-                <div id="sousdossierGrid" class="grid gap-3 grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"></div>
-
-                <!-- Galerie -->
-                <div id="galerieSection" class="hidden rounded-3xl bg-slate-900 dark:bg-black border border-white/5 p-8 shadow-2xl">
-                    <div class="mb-8 flex items-center justify-between border-b border-white/5 pb-6">
-                        <div>
-                            <h3 id="galerieTitle" class="text-xs font-black text-indigo-400 uppercase tracking-widest"></h3>
-                            <p class="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-widest italic uppercase">Visualisation</p>
-                        </div>
-                        <button id="btnCloseGalerie" class="h-10 w-10 rounded-full bg-slate-800 text-white hover:bg-red-500 transition border border-white/5">
-                            <i class="fas fa-times text-xs"></i>
-                        </button>
-                    </div>
-                    <div class="mb-6 flex items-center justify-between">
-                        <button id="btnFolderBack" class="hidden rounded-xl bg-slate-800 border border-white/10 px-5 py-3 text-[9px] font-black uppercase tracking-widest text-indigo-300 hover:bg-slate-700 transition">
-                            <i class="fas fa-arrow-left mr-2"></i> Retour
-                        </button>
-                        <div></div>
-                    </div>
-                    <div id="galerieGrid" class="grid gap-2 grid-cols-4 md:grid-cols-6 lg:grid-cols-8"></div>
-                </div>
-            </div>
-        </section>
     </div>
+
+    <!-- Overlay pour le panneau latéral -->
+    <div id="detailOverlay" class="fixed inset-0 z-[55] bg-slate-950/40 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-500"></div>
+
+    <!-- Panneau Central (Modal) : Détails -->
+    <section id="detailView" class="fixed inset-0 z-[60] flex items-center justify-center p-4 md:p-8 invisible">
+        <div id="detailContent" class="relative w-full max-w-5xl h-[90vh] bg-slate-50 dark:bg-slate-950 rounded-[3rem] shadow-[-20px_0_50px_rgba(0,0,0,0.2)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.6)] border border-slate-200 dark:border-white/10 overflow-y-auto space-y-10 p-6 md:p-12 scrollbar-thin transform scale-95 opacity-0 transition-all duration-500 ease-out">
+            <!-- En-tête -->
+            <div class="rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/5 p-8 shadow-xl">
+                <div class="flex items-center justify-between mb-6">
+                    <button id="btnBack" class="group flex items-center gap-3 rounded-xl bg-slate-900 px-5 py-3 text-[10px] font-black uppercase text-white hover:bg-indigo-600 transition">
+                        <i class="fas fa-times transition group-hover:rotate-90"></i> Fermer
+                    </button>
+                    <div class="flex gap-2">
+                        <div class="h-1.5 w-1.5 rounded-full bg-slate-300 dark:bg-slate-600"></div>
+                        <div class="h-1.5 w-1.5 rounded-full bg-indigo-500"></div>
+                    </div>
+                </div>
+                <h2 id="detailTitle" class="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter uppercase leading-none italic"></h2>
+            </div>
+
+            <!-- Grille des Sous-dossiers -->
+            <div id="folderBar" class="hidden items-center justify-between gap-4 rounded-2xl bg-white/70 dark:bg-slate-900/40 border border-slate-200 dark:border-white/5 px-5 py-4">
+                <button id="btnFolderBackTop" class="rounded-xl bg-slate-900 px-5 py-3 text-[9px] font-black uppercase tracking-widest text-white hover:bg-indigo-600 transition">
+                    <i class="fas fa-arrow-left mr-2"></i> Retour
+                </button>
+                <div id="folderPath" class="flex-1 text-right text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 truncate"></div>
+            </div>
+            <div id="sousdossierGrid" class="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"></div>
+
+            <!-- Galerie -->
+            <div id="galerieSection" class="hidden rounded-3xl bg-slate-900 dark:bg-black border border-white/5 p-8 shadow-2xl">
+                <div class="mb-8 flex items-center justify-between border-b border-white/5 pb-6">
+                    <div>
+                        <h3 id="galerieTitle" class="text-xs font-black text-indigo-400 uppercase tracking-widest"></h3>
+                        <p class="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-widest italic uppercase">Visualisation</p>
+                    </div>
+                    <button id="btnCloseGalerie" class="h-10 w-10 rounded-full bg-slate-800 text-white hover:bg-red-500 transition border border-white/5">
+                        <i class="fas fa-times text-xs"></i>
+                    </button>
+                </div>
+                <div id="galerieGrid" class="grid gap-2 grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7"></div>
+            </div>
+        </div>
+    </section>
 
     <!-- Placeholder -->
     <div id="placeholder" class="hidden py-40 text-center">

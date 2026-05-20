@@ -5,9 +5,12 @@
 // ============================================================
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/auth.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
+
+require_login();
 
 function computeParentNom(string $nom): ?string {
     $nom = trim($nom);

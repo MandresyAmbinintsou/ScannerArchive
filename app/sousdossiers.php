@@ -5,9 +5,12 @@
 // ============================================================
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/auth.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
+
+require_login();
 
 try {
     $matriculeId = (int)($_GET['matricule_id'] ?? 0);

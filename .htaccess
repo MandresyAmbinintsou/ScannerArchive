@@ -1,0 +1,14 @@
+# Autoriser explicitement l'accès externe pour ce dossier
+<IfModule mod_authz_core.c>
+    Require all granted
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Allow from all
+</IfModule>
+
+# Sécurité : masquer le listage des fichiers
+Options -Indexes
+
+# Redirection vers l'index si nécessaire (propre à l'application)
+DirectoryIndex index.php

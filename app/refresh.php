@@ -3,11 +3,14 @@
 // refresh.php — API de réindexation pour mettre à jour le contenu après F5
 // ============================================================
 
+require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/scan.php';
 
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
+
+require_login();
+ensureSessionStarted();
 
 try {
     $db = getDB();
@@ -19,6 +22,10 @@ try {
         $archiveRoot = getLastScannedRoot($db) ?: ARCHIVE_ROOT;
         $archiveRoot = validatePath($archiveRoot);
     }
+
+    // Garder la session alignée avec la racine effectivement scannée.
+    // Sinon app/image.php peut refuser l'accès (403) et les PDF/images semblent "cassés".
+    $_SESSION['archive_root'] = $archiveRoot;
 
     $summary = scanArchive($db, $archiveRoot);
 

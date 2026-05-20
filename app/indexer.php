@@ -52,12 +52,30 @@ try {
                 $output = scanArchive($db, $archiveRoot);
                 $message = 'Scanner Go introuvable ou non exécutable ; fallback sur le moteur PHP.';
             } else {
-                $output = scanArchiveGo($db, $archiveRoot);
-                $message = 'Indexation terminée avec le moteur Go.';
+                try {
+                    $output = scanArchiveGo($db, $archiveRoot);
+                    $message = 'Indexation terminée avec le moteur Go.';
+                } catch (Throwable $goErr) {
+                    // Fallback sécurité : si Go échoue, essayer PHP.
+                    $output = scanArchive($db, $archiveRoot);
+                    $message = 'Erreur moteur Go ; fallback sur le moteur PHP.';
+                }
             }
         } else {
-            $output = scanArchive($db, $archiveRoot);
-            $message = 'Indexation terminée avec le moteur PHP.';
+            try {
+                $output = scanArchive($db, $archiveRoot);
+                $message = 'Indexation terminée avec le moteur PHP.';
+            } catch (Throwable $phpErr) {
+                // Si PHP échoue, tenter Go automatiquement (si dispo).
+                if (isGoScannerAvailable()) {
+                    $output = scanArchiveGo($db, $archiveRoot);
+                    $message = 'Erreur moteur PHP ; fallback automatique sur le moteur Go.';
+                    $engine = 'go';
+                    $_SESSION['index_engine'] = 'go';
+                } else {
+                    throw $phpErr;
+                }
+            }
         }
         
         $_SESSION['index_message'] = $message;
@@ -190,10 +208,16 @@ require_once __DIR__ . '/header.php';
     </div>
 </main>
 
-<!-- Modal : Explorateur de dossiers -->
-<div id="dirPickerModal" class="fixed inset-0 z-[120] hidden items-center justify-center p-4">
-    <div id="dirPickerOverlay" class="absolute inset-0 bg-slate-950/70 backdrop-blur-sm"></div>
-    <div class="relative w-full max-w-3xl rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 shadow-2xl overflow-hidden">
+<style>
+    /* Fallback: si <dialog> n'est pas supporté, éviter d'afficher le contenu en permanence */
+    dialog:not([open]) { display: none; }
+    dialog::backdrop { background: rgba(2, 6, 23, 0.7); backdrop-filter: blur(6px); }
+</style>
+
+<!-- Explorateur de dossiers (serveur) -->
+<!-- Note : le navigateur ne peut pas ouvrir le sélecteur Windows pour un chemin serveur.
+     On fournit donc un explorateur côté serveur via API. -->
+<dialog id="dirPickerModal" class="z-[120] w-full max-w-3xl rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 shadow-2xl overflow-hidden p-0">
         <div class="flex items-center justify-between px-8 py-6 border-b border-slate-100 dark:border-white/5">
             <div class="flex items-center gap-4">
                 <div class="h-12 w-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-600/20">
@@ -230,13 +254,11 @@ require_once __DIR__ . '/header.php';
         <div class="max-h-[55vh] overflow-auto px-4 py-4">
             <div id="dirPickerList" class="grid gap-2"></div>
         </div>
-    </div>
-</div>
+    </dialog>
 
 <script>
 (() => {
     const modal = document.getElementById('dirPickerModal');
-    const overlay = document.getElementById('dirPickerOverlay');
     const btnClose = document.getElementById('dirPickerClose');
     const btnBrowse = document.getElementById('btnBrowseRoot');
     const btnUp = document.getElementById('dirPickerUp');
@@ -254,14 +276,22 @@ require_once __DIR__ . '/header.php';
     }[c]));
 
     function openModal() {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
+        if (modal && typeof modal.showModal === 'function') {
+            modal.showModal();
+        } else if (modal) {
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
         loadPath(rootInput.value.trim() || '');
     }
 
     function closeModal() {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
+        if (modal && typeof modal.close === 'function') {
+            modal.close();
+        } else if (modal) {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
     }
 
     async function api(url) {
@@ -272,6 +302,16 @@ require_once __DIR__ . '/header.php';
             throw new Error(msg);
         }
         return data;
+    }
+
+    async function tryNativePicker() {
+        // Ouvre le picker OS côté machine où PHP tourne (utile en mode local/portable).
+        const res = await fetch('native_picker.php', { cache: 'no-store' });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data || data.ok === false) {
+            return null;
+        }
+        return (data.path || '').trim() || null;
     }
 
     function setLoading() {
@@ -362,9 +402,16 @@ require_once __DIR__ . '/header.php';
         renderDirs(data.dirs || []);
     }
 
-    btnBrowse?.addEventListener('click', openModal);
+    btnBrowse?.addEventListener('click', async () => {
+        const picked = await tryNativePicker();
+        if (picked) {
+            rootInput.value = picked;
+            return;
+        }
+        // Fallback: explorateur web côté serveur (si picker natif indisponible).
+        openModal();
+    });
     btnClose?.addEventListener('click', closeModal);
-    overlay?.addEventListener('click', closeModal);
     btnRoots?.addEventListener('click', () => loadRoots());
     btnUp?.addEventListener('click', () => parentPath ? loadPath(parentPath) : loadRoots());
     btnSelect?.addEventListener('click', () => {
@@ -372,7 +419,8 @@ require_once __DIR__ . '/header.php';
         closeModal();
     });
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+        const isOpen = modal && (modal.open === true || !modal.classList.contains('hidden'));
+        if (e.key === 'Escape' && isOpen) closeModal();
     });
 })();
 </script>

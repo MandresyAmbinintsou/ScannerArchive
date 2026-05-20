@@ -38,6 +38,7 @@ const els = {
     btnRefresh:     document.getElementById('btnRefresh'),
     placeholder:    document.getElementById('placeholder'),
     detailView:     document.getElementById('detailView'),
+    detailOverlay:  document.getElementById('detailOverlay'),
     detailContent:  document.getElementById('detailContent'),
     detailTitle:    document.getElementById('detailTitle'),
     sousdossierGrid:document.getElementById('sousdossierGrid'),
@@ -298,34 +299,20 @@ function attachMatriculeEvents() {
  * Sélection d'un matricule
  */
 async function selectMatricule(id, nom, clickedEl = null) {
-    if (state.currentMatricule?.id === id) return;
-    
-    // 1. Mémoriser la position et figer la hauteur pour éviter le "shrink"
-    const scrollY = window.scrollY;
-    document.body.style.minHeight = document.documentElement.scrollHeight + 'px';
+    if (state.currentMatricule?.id === id) {
+        // Si déjà ouvert, on s'assure qu'il est visible
+        openDetailDrawer();
+        return;
+    }
     
     state.currentMatricule = { id, nom };
-    state.isSplitView = true;
     
-    // 2. Appliquer les changements de layout
-    els.mainContainer.classList.replace('max-w-6xl', 'max-w-[1700px]');
-    els.layoutWrapper.classList.replace('flex-col', 'md:flex-row');
-    // Suppression de items-start pour que la colonne de droite s'étire sur toute la hauteur
-    els.layoutWrapper.classList.remove('items-start'); 
-    
-    els.sidebarList.classList.remove('w-full', 'max-w-3xl', 'mx-auto');
-    els.sidebarList.classList.add('md:w-[450px]', 'shrink-0');
-    
-    // 3. Affichage immédiat du bloc détail
-    els.detailView.classList.remove('hidden');
+    // Affichage du panneau
+    openDetailDrawer();
     els.detailTitle.textContent = nom;
-    els.detailContent.scrollTop = 0; // On remet le scroll interne du détail à zéro
+    els.detailContent.scrollTop = 0;
 
-    // 4. RESTAURER la position pour éviter le saut (important)
-    window.scrollTo(0, scrollY);
-    setTimeout(() => { document.body.style.minHeight = ''; }, 100);
-    
-    // 5. Charger les données
+    // Charger les données
     els.galerieSection.classList.add('hidden');
     state.folderStack = ['.'];
     els.sousdossierGrid.innerHTML = `
@@ -334,15 +321,46 @@ async function selectMatricule(id, nom, clickedEl = null) {
             <p class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 animate-pulse">Récupération des dossiers...</p>
         </div>
     `;
-    els.galerieSection.classList.add('hidden');
 
     try {
         await renderExplorerLevel('.');
-
     } catch (err) {
         console.error('Erreur Sous-dossiers:', err);
-        els.sousdossierGrid.innerHTML = `<div class="col-span-full py-10 text-center text-red-500 font-black uppercase text-[10px] border border-red-100 rounded-2xl bg-red-50/50">Erreur de chargement des données</div>`;
+        els.sousdossierGrid.innerHTML = `<div class="col-span-full py-10 text-center text-red-500 font-black uppercase text-[10px] border border-red-100 rounded-2xl bg-red-50/50">Erreur de chargement</div>`;
     }
+}
+
+function openDetailDrawer() {
+    els.detailView.classList.remove('invisible');
+    els.detailOverlay.classList.remove('opacity-0', 'pointer-events-none');
+    els.detailOverlay.classList.add('opacity-100');
+    
+    // Animation du contenu (Scale + Fade)
+    setTimeout(() => {
+        els.detailContent.classList.remove('scale-95', 'opacity-0');
+        els.detailContent.classList.add('scale-100', 'opacity-100');
+    }, 10);
+    
+    document.body.style.overflow = 'hidden'; 
+}
+
+function closeDetailDrawer() {
+    els.detailContent.classList.replace('scale-100', 'scale-95');
+    els.detailContent.classList.replace('opacity-100', 'opacity-0');
+    els.detailOverlay.classList.replace('opacity-100', 'opacity-0');
+    els.detailOverlay.classList.add('pointer-events-none');
+    
+    setTimeout(() => {
+        if (els.detailContent.classList.contains('opacity-0')) {
+            els.detailView.classList.add('invisible');
+            document.body.style.overflow = '';
+        }
+    }, 500);
+
+    state.currentMatricule = null;
+    els.matriculeList.querySelectorAll('.matricule-row').forEach(r => {
+        r.classList.remove('border-indigo-600', 'bg-indigo-50/50', 'dark:bg-slate-900', 'shadow-inner');
+    });
 }
 
 function updateFolderBar() {
@@ -576,28 +594,10 @@ function closeLightbox() {
     document.body.style.overflow = '';
 }
 
-// RETOUR : Reset layout
-els.btnBack?.addEventListener('click', () => {
-    const scrollY = window.scrollY;
-    document.body.style.minHeight = document.documentElement.scrollHeight + 'px';
+// RETOUR : Fermer le panneau
+els.btnBack?.addEventListener('click', closeDetailDrawer);
+els.detailOverlay?.addEventListener('click', closeDetailDrawer);
 
-    state.currentMatricule = null;
-    state.isSplitView = false;
-
-    els.detailView.classList.add('hidden');
-    els.mainContainer.classList.replace('max-w-[1700px]', 'max-w-6xl');
-    els.layoutWrapper.classList.replace('md:flex-row', 'flex-col');
-
-    els.sidebarList.classList.remove('md:w-[450px]', 'shrink-0');
-    els.sidebarList.classList.add('w-full', 'max-w-3xl', 'mx-auto');
-
-    els.matriculeList.querySelectorAll('.matricule-row').forEach(r => {
-        r.classList.remove('border-indigo-600', 'bg-indigo-50/50', 'dark:bg-slate-900', 'shadow-inner');
-    });
-
-    window.scrollTo(0, scrollY);
-    setTimeout(() => { document.body.style.minHeight = ''; }, 100);
-});
 els.btnCloseGalerie?.addEventListener('click', () => {
     els.galerieSection.classList.add('hidden');
 });

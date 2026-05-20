@@ -19,8 +19,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Le mot de passe doit contenir au moins 6 caractères.';
     } else {
         $role = $firstSetup ? 'admin' : 'user';
-        if (createUser($username, $password, $role)) {
-            $message = 'Compte créé avec succès ! <a href="login.php">Se connecter</a>';
+        // Après le premier admin, un compte créé via ce formulaire doit être approuvé par l'admin.
+        $approved = $firstSetup ? true : false;
+        if (createUser($username, $password, $role, $approved)) {
+            if ($approved) {
+                $message = 'Compte admin créé avec succès ! <a href="login.php">Se connecter</a>';
+            } else {
+                $message = 'Compte créé. En attente de validation administrateur. <a href="login.php">Retour connexion</a>';
+            }
         } else {
             $error = 'Erreur lors de la création du compte. Le nom d\'utilisateur existe peut-être déjà.';
         }
@@ -98,8 +104,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <label class="text-[10px] font-black uppercase tracking-widest text-slate-400">Mot de passe</label>
                     <div class="relative group">
                         <i class="fas fa-lock absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition"></i>
-                        <input type="password" name="password" required
-                               class="w-full rounded-2xl border-none bg-slate-50 dark:bg-slate-950 py-4 pl-14 pr-6 text-sm font-bold text-slate-900 dark:text-white shadow-inner focus:ring-4 focus:ring-indigo-600/10 transition outline-none">
+                        <input type="password" name="password" id="password" required
+                               class="w-full rounded-2xl border-none bg-slate-50 dark:bg-slate-950 py-4 pl-14 pr-12 text-sm font-bold text-slate-900 dark:text-white shadow-inner focus:ring-4 focus:ring-indigo-600/10 transition outline-none">
+                        <button type="button" onclick="togglePassword('password', this)" class="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-500 transition">
+                            <i class="fas fa-eye"></i>
+                        </button>
                     </div>
                 </div>
 
@@ -107,8 +116,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <label class="text-[10px] font-black uppercase tracking-widest text-slate-400">Confirmer</label>
                     <div class="relative group">
                         <i class="fas fa-shield-alt absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition"></i>
-                        <input type="password" name="confirm_password" required
-                               class="w-full rounded-2xl border-none bg-slate-50 dark:bg-slate-950 py-4 pl-14 pr-6 text-sm font-bold text-slate-900 dark:text-white shadow-inner focus:ring-4 focus:ring-indigo-600/10 transition outline-none">
+                        <input type="password" name="confirm_password" id="confirm_password" required
+                               class="w-full rounded-2xl border-none bg-slate-50 dark:bg-slate-950 py-4 pl-14 pr-12 text-sm font-bold text-slate-900 dark:text-white shadow-inner focus:ring-4 focus:ring-indigo-600/10 transition outline-none">
+                        <button type="button" onclick="togglePassword('confirm_password', this)" class="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-500 transition">
+                            <i class="fas fa-eye"></i>
+                        </button>
                     </div>
                 </div>
 
@@ -131,6 +143,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <script>
+        function togglePassword(id, btn) {
+            const input = document.getElementById(id);
+            const icon = btn.querySelector('i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('fa-eye', 'fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('fa-eye-slash', 'fa-eye');
+            }
+        }
+
         if (localStorage.theme === 'light' || (!('theme' in localStorage) && !window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.documentElement.classList.remove('dark')
         } else {
