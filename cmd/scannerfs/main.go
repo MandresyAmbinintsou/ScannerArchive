@@ -36,6 +36,7 @@ type Matricule struct {
 	SousCount    int    `json:"sous_count"`
 	ImagesCount  int    `json:"images_count"`
 	SkippedItems int    `json:"skipped_items"`
+	MTime        int64  `json:"mtime"`
 }
 
 type SousDossier struct {
@@ -44,6 +45,7 @@ type SousDossier struct {
 	Path          string `json:"path"`
 	ImagesCount   int    `json:"images_count"`
 	SkippedItems  int    `json:"skipped_items"`
+	MTime         int64  `json:"mtime"`
 }
 
 type ImageItem struct {
@@ -201,6 +203,10 @@ func main() {
 
 			localSous := len(dirJobs)
 			localImg := 0
+			var matMTime int64
+			if st, err := os.Stat(matPath); err == nil {
+				matMTime = st.ModTime().Unix()
+			}
 
 			emit(Event{Type: "matricule", Mat: &Matricule{
 				Name:         j.matName,
@@ -208,6 +214,7 @@ func main() {
 				SousCount:    localSous,
 				ImagesCount:  0,
 				SkippedItems: 0,
+				MTime:        matMTime,
 			}})
 
 			for _, d := range dirJobs {
@@ -216,6 +223,11 @@ func main() {
 					warn(fmt.Sprintf("Impossible de lire %s: %v", d.abs, err))
 					skippedMat++
 					continue
+				}
+
+				var sousMTime int64
+				if st, err := os.Stat(d.abs); err == nil {
+					sousMTime = st.ModTime().Unix()
 				}
 
 				nbImages := 0
@@ -243,6 +255,7 @@ func main() {
 					Path:          d.abs,
 					ImagesCount:   nbImages,
 					SkippedItems:  skippedSous,
+					MTime:         sousMTime,
 				}})
 
 				for _, imgName := range collectedImages {

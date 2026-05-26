@@ -66,10 +66,21 @@ function getLastScannedRoot(PDO $db): ?string {
 
 function getScanHistory(PDO $db, int $limit = 20): array {
     ensureScanHistoryTable($db);
-    $stmt = $db->prepare('SELECT root_path, created_at FROM scan_history ORDER BY created_at DESC LIMIT :limit');
+    $stmt = $db->prepare('SELECT id, root_path, created_at FROM scan_history ORDER BY created_at DESC LIMIT :limit');
     $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
     $stmt->execute();
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function deleteHistoryItem(PDO $db, int $id): bool {
+    ensureScanHistoryTable($db);
+    $stmt = $db->prepare('DELETE FROM scan_history WHERE id = :id');
+    return $stmt->execute([':id' => $id]);
+}
+
+function clearAllHistory(PDO $db): bool {
+    ensureScanHistoryTable($db);
+    return (bool)$db->exec('TRUNCATE TABLE scan_history');
 }
 
 /**
@@ -141,12 +152,13 @@ function scanArchive(PDO $db, string $archiveRoot): string {
 
             // Compter sous-dossiers (on inclut la racine '.' pour indexer les fichiers "entre" sous-dossiers).
             $sousCount = count($relDirs);
+            $matMTime = @filemtime($matPath) ?: 0;
 
             // Insérer matricule
             $matId = insertAndGetId(
                 $db,
-                "INSERT INTO matricules (nom, chemin, nb_sousdossiers) VALUES (?, ?, ?)",
-                [$matName, $matPath, $sousCount]
+                "INSERT INTO matricules (nom, chemin, nb_sousdossiers, modifie_le) VALUES (?, ?, ?, ?)",
+                [$matName, $matPath, $sousCount, $matMTime]
             );
             $totalMat++;
 
@@ -160,6 +172,8 @@ function scanArchive(PDO $db, string $archiveRoot): string {
                 }
 
                 $images = [];
+                $sousMTime = @filemtime($sousPath) ?: 0;
+                
                 try {
                     $it = new FilesystemIterator($sousPath, FilesystemIterator::SKIP_DOTS);
                 } catch (UnexpectedValueException $e) {
@@ -179,8 +193,8 @@ function scanArchive(PDO $db, string $archiveRoot): string {
                 $nbImages = count($images);
                 $sousDossierId = insertAndGetId(
                     $db,
-                    "INSERT INTO sousdossiers (matricule_id, nom, chemin, nb_images) VALUES (?, ?, ?, ?)",
-                    [$matId, $sousName, $sousPath, $nbImages]
+                    "INSERT INTO sousdossiers (matricule_id, nom, chemin, nb_images, modifie_le) VALUES (?, ?, ?, ?, ?)",
+                    [$matId, $sousName, $sousPath, $nbImages, $sousMTime]
                 );
                 $totalSous++;
                 $totalImg += $nbImages;

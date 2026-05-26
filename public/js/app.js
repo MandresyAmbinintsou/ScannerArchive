@@ -237,7 +237,10 @@ async function loadMatricules(append = false) {
                     </div>
                     <div class="truncate">
                         <div class="text-[20px] font-black text-slate-900 dark:text-white uppercase tracking-tight truncate">${escapeHtml(m.nom)}</div>
-                        <div class="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] mt-2 italic">${m.nb_sousdossiers} Dossiers Archivés</div>
+                        <div class="flex gap-4 mt-2 italic">
+                            <div class="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em]">${m.nb_sousdossiers} Dossiers Archivés</div>
+                            ${m.modifie_le ? `<div class="text-[11px] font-bold text-indigo-400 uppercase tracking-[0.1em]"><i class="far fa-calendar-alt mr-1"></i> ${formatDate(m.modifie_le)}</div>` : ''}
+                        </div>
                     </div>
                 </div>
                 <div class="flex items-center gap-4">
@@ -296,11 +299,95 @@ function attachMatriculeEvents() {
 }
 
 /**
+ * Gestion de l'historique (Hash)
+ */
+function updateHash() {
+    if (!state.currentMatricule) {
+        if (window.location.hash !== '') {
+            history.pushState(null, null, ' ');
+        }
+        return;
+    }
+
+    const mid = state.currentMatricule.id;
+    const currentFolder = state.folderStack[state.folderStack.length - 1] || '.';
+    let newHash = `#m=${mid}&f=${encodeURIComponent(currentFolder)}`;
+    
+    if (state.currentImage) {
+        newHash += `&i=${state.currentImage.id}`;
+    }
+
+    if (window.location.hash !== newHash) {
+        history.pushState({ mid, folder: currentFolder, imgId: state.currentImage?.id }, '', newHash);
+    }
+}
+
+function handleHashChange() {
+    const hash = window.location.hash.substring(1);
+    const params = new URLSearchParams(hash);
+    const mid = params.get('m');
+    const folder = params.get('f');
+    const imgId = params.get('i');
+
+    if (!mid) {
+        if (state.currentMatricule) {
+            closeDetailDrawer(false);
+        }
+        return;
+    }
+
+    const mId = parseInt(mid);
+    if (!state.currentMatricule || state.currentMatricule.id !== mId) {
+        const row = els.matriculeList.querySelector(`.matricule-row[data-id="${mId}"]`);
+        const nom = row ? row.dataset.nom : `Matricule #${mId}`;
+        
+        state.currentMatricule = { id: mId, nom: nom };
+        openDetailDrawer(false);
+        els.detailTitle.textContent = nom;
+    }
+
+    if (folder) {
+        const decodedFolder = decodeURIComponent(folder);
+        const current = state.folderStack[state.folderStack.length - 1] || '.';
+        if (current !== decodedFolder) {
+            if (decodedFolder === '.') {
+                state.folderStack = ['.'];
+            } else {
+                const parts = decodedFolder.split('/').filter(Boolean);
+                let cumulative = '';
+                const stack = ['.'];
+                for (const p of parts) {
+                    cumulative = cumulative ? `${cumulative}/${p}` : p;
+                    stack.push(cumulative);
+                }
+                state.folderStack = stack;
+            }
+            renderExplorerLevel(decodedFolder);
+        }
+    }
+
+    // Gestion de la Lightbox
+    if (imgId) {
+        const iId = parseInt(imgId);
+        if (!state.currentImage || state.currentImage.id !== iId) {
+            // Chercher l'image dans le DOM pour avoir l'URL et le Nom
+            const imgEl = document.querySelector(`.explorer-file[data-id="${iId}"], .img-card[data-id="${iId}"]`);
+            if (imgEl) {
+                openLightbox(iId, imgEl.dataset.url, imgEl.dataset.nom, false);
+            }
+        }
+    } else {
+        if (state.currentImage) {
+            closeLightbox(false);
+        }
+    }
+}
+
+/**
  * Sélection d'un matricule
  */
 async function selectMatricule(id, nom, clickedEl = null) {
     if (state.currentMatricule?.id === id) {
-        // Si déjà ouvert, on s'assure qu'il est visible
         openDetailDrawer();
         return;
     }
@@ -315,6 +402,8 @@ async function selectMatricule(id, nom, clickedEl = null) {
     // Charger les données
     els.galerieSection.classList.add('hidden');
     state.folderStack = ['.'];
+    updateHash(); // <--- Mise à jour du Hash
+
     els.sousdossierGrid.innerHTML = `
         <div class="col-span-full py-32 text-center">
             <div class="inline-flex h-16 w-16 items-center justify-center rounded-full border-4 border-indigo-600/20 border-t-indigo-600 animate-spin mb-6"></div>
@@ -330,7 +419,7 @@ async function selectMatricule(id, nom, clickedEl = null) {
     }
 }
 
-function openDetailDrawer() {
+function openDetailDrawer(pushHash = true) {
     els.detailView.classList.remove('invisible');
     els.detailOverlay.classList.remove('opacity-0', 'pointer-events-none');
     els.detailOverlay.classList.add('opacity-100');
@@ -342,9 +431,10 @@ function openDetailDrawer() {
     }, 10);
     
     document.body.style.overflow = 'hidden'; 
+    if (pushHash) updateHash();
 }
 
-function closeDetailDrawer() {
+function closeDetailDrawer(pushHash = true) {
     els.detailContent.classList.replace('scale-100', 'scale-95');
     els.detailContent.classList.replace('opacity-100', 'opacity-0');
     els.detailOverlay.classList.replace('opacity-100', 'opacity-0');
@@ -358,6 +448,8 @@ function closeDetailDrawer() {
     }, 500);
 
     state.currentMatricule = null;
+    if (pushHash) updateHash();
+
     els.matriculeList.querySelectorAll('.matricule-row').forEach(r => {
         r.classList.remove('border-indigo-600', 'bg-indigo-50/50', 'dark:bg-slate-900', 'shadow-inner');
     });
@@ -422,10 +514,13 @@ async function renderExplorerLevel(levelNom) {
         const isPdf = name.toLowerCase().endsWith('.pdf');
         const icon = isPdf ? '<div class="absolute inset-0 flex items-center justify-center text-red-500 bg-slate-900/50"><i class="fas fa-file-pdf text-2xl"></i></div>' : '';
         return `
-            <button type="button" class="explorer-file group relative aspect-square overflow-hidden rounded-xl bg-slate-900/60 shadow-lg border border-white/10" data-id="${img.id}" data-url="${img.url}" data-nom="${escapeHtml(name)}">
-                ${isPdf ? icon : `<img class="h-full w-full object-cover transition duration-700 group-hover:scale-110 opacity-90" src="${img.url}" alt="${escapeHtml(name)}" loading="lazy">`}
-                <div class="absolute inset-0 bg-indigo-600/10 opacity-0 group-hover:opacity-100 transition duration-500"></div>
-            </button>
+            <div class="flex flex-col gap-3">
+                <button type="button" class="explorer-file group relative aspect-square overflow-hidden rounded-xl bg-slate-900/60 shadow-lg border border-white/10" data-id="${img.id}" data-url="${img.url}" data-nom="${escapeHtml(name)}">
+                    ${isPdf ? icon : `<img class="h-full w-full object-cover transition duration-700 group-hover:scale-110 opacity-90" src="${img.url}" alt="${escapeHtml(name)}" loading="lazy">`}
+                    <div class="absolute inset-0 bg-indigo-600/10 opacity-0 group-hover:opacity-100 transition duration-500"></div>
+                </button>
+                <div class="text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-tighter truncate w-full px-1 text-center" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
+            </div>
         `;
     }).join('');
 
@@ -443,7 +538,10 @@ async function renderExplorerLevel(levelNom) {
                     <i class="fas fa-folder-open text-lg"></i>
                 </div>
                 <div class="relative z-10 text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tight truncate w-full px-1">${escapeHtml(label)}</div>
-                <div class="relative z-10 mt-2 text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest italic">${Number(f.nb_images) || 0} fichiers</div>
+                <div class="relative z-10 mt-2 flex flex-col gap-0.5">
+                    <div class="text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest italic">${Number(f.nb_images) || 0} fichiers</div>
+                    ${f.modifie_le ? `<div class="text-[8px] font-bold text-indigo-400/70 uppercase tracking-widest italic">${formatDate(f.modifie_le)}</div>` : ''}
+                </div>
             </button>
         `;
     }).join('');
@@ -462,6 +560,7 @@ async function openFolder(folderNom) {
     const nom = (folderNom || '.').trim() || '.';
     state.folderStack.push(nom);
     updateFolderBar();
+    updateHash(); // <--- Ajouté
     await renderExplorerLevel(nom);
 }
 
@@ -507,13 +606,17 @@ async function loadGalerie(sousDossierId, nom, append = false) {
         }
 
         const imagesHtml = rows.map(img => {
-            const isPdf = img.nom_fichier.toLowerCase().endsWith('.pdf');
+            const name = img.nom_fichier || '';
+            const isPdf = name.toLowerCase().endsWith('.pdf');
             const icon = isPdf ? '<div class="absolute inset-0 flex items-center justify-center text-red-500 bg-slate-900/50"><i class="fas fa-file-pdf text-3xl"></i></div>' : '';
             return `
-                <button type="button" class="img-card group relative aspect-square overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-900 shadow-lg border border-white/5" data-id="${img.id}" data-url="${img.url}" data-nom="${escapeHtml(img.nom_fichier)}">
-                    ${isPdf ? icon : `<img class="h-full w-full object-cover transition duration-700 group-hover:scale-110 opacity-80 dark:opacity-50 group-hover:opacity-100" src="${img.url}" alt="${escapeHtml(img.nom_fichier)}" loading="lazy">`}
-                    <div class="absolute inset-0 bg-indigo-600/10 opacity-0 group-hover:opacity-100 transition duration-500"></div>
-                </button>
+                <div class="flex flex-col gap-3">
+                    <button type="button" class="img-card group relative aspect-square overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-900 shadow-lg border border-white/5" data-id="${img.id}" data-url="${img.url}" data-nom="${escapeHtml(name)}">
+                        ${isPdf ? icon : `<img class="h-full w-full object-cover transition duration-700 group-hover:scale-110 opacity-80 dark:opacity-50 group-hover:opacity-100" src="${img.url}" alt="${escapeHtml(name)}" loading="lazy">`}
+                        <div class="absolute inset-0 bg-indigo-600/10 opacity-0 group-hover:opacity-100 transition duration-500"></div>
+                    </button>
+                    <div class="text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-tighter truncate w-full px-1 text-center" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
+                </div>
             `;
         }).join('');
 
@@ -550,7 +653,8 @@ async function loadGalerie(sousDossierId, nom, append = false) {
     }
 }
 
-function openLightbox(id, url, nom) {
+function openLightbox(id, url, nom, pushHash = true) {
+    state.currentImage = { id, url, nom };
     const isPdf = nom.toLowerCase().endsWith('.pdf');
     const lightboxContainer = els.lightboxImg.parentNode;
     
@@ -572,7 +676,9 @@ function openLightbox(id, url, nom) {
         els.lightboxImg.src = url;
         els.lightboxImg.classList.remove('hidden');
         if (els.lightboxPrint) {
+            // Force l'URL vers le script PHP du serveur qui exécute ImageMagick
             els.lightboxPrint.href = `${BASE}app/print_pdf.php?id=${id}`;
+            els.lightboxPrint.target = "_blank"; // Ouvrir dans un nouvel onglet pour l'impression
             els.lightboxPrint.classList.remove('hidden');
         }
     }
@@ -581,8 +687,10 @@ function openLightbox(id, url, nom) {
     els.lightbox.classList.remove('hidden');
     els.lightbox.classList.add('flex');
     document.body.style.overflow = 'hidden';
+
+    if (pushHash) updateHash();
 }
-function closeLightbox() {
+function closeLightbox(pushHash = true) {
     els.lightbox.classList.add('hidden');
     els.lightbox.classList.remove('flex');
     els.lightboxImg.src = '';
@@ -592,6 +700,8 @@ function closeLightbox() {
     if (iframe) iframe.remove();
     
     document.body.style.overflow = '';
+    state.currentImage = null;
+    if (pushHash) updateHash();
 }
 
 // RETOUR : Fermer le panneau
@@ -606,6 +716,7 @@ els.btnFolderBackTop?.addEventListener('click', async () => {
     if (!Array.isArray(state.folderStack) || state.folderStack.length <= 1) return;
     state.folderStack.pop();
     updateFolderBar();
+    updateHash(); // <--- Ajouté
     const prev = state.folderStack[state.folderStack.length - 1] || '.';
     await renderExplorerLevel(prev);
 });
@@ -630,6 +741,7 @@ els.folderPath?.addEventListener('click', async (e) => {
     }
 
     updateFolderBar();
+    updateHash(); // <--- Ajouté
     await renderExplorerLevel(targetNom);
 });
 
@@ -657,10 +769,23 @@ els.btnRefresh?.addEventListener('click', async () => {
  * Initialisation
  */
 window.addEventListener('DOMContentLoaded', () => {
-    loadMatricules();
+    loadMatricules().then(() => {
+        // Gérer le hash initial après le chargement des matricules
+        if (window.location.hash) {
+            handleHashChange();
+        }
+    });
     initSocket();
 });
 
+window.addEventListener('popstate', handleHashChange);
+
 function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+}
+
+function formatDate(timestamp) {
+    if (!timestamp) return '';
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }

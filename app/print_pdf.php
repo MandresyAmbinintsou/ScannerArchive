@@ -62,18 +62,44 @@ if (!$startsWithAllowed) {
 // Nettoyage du nom de fichier pour le PDF
 $filename = pathinfo($nomFichier, PATHINFO_FILENAME) . '.pdf';
 
-// Tester si ImageMagick est disponible
-// Sur Windows, 'magick -version' devrait fonctionner si installé
-exec('magick -version', $out, $status);
-if ($status !== 0) {
-    // Tenter 'convert' (ancienne syntaxe ou compatibilité)
-    exec('convert -version', $out2, $status2);
-    if ($status2 !== 0) {
-        die("ImageMagick n'est pas installé ou n'est pas dans le PATH du système. Veuillez installer ImageMagick et l'ajouter au PATH.");
+// Déterminer le chemin de ImageMagick
+$cmdName = MAGICK_PATH;
+
+function checkMagick($cmd) {
+    exec(sprintf('%s -version', $cmd), $out, $status);
+    return $status === 0;
+}
+
+if (!checkMagick($cmdName)) {
+    // Fallback 1: 'convert'
+    if (checkMagick('convert')) {
+        $cmdName = 'convert';
+    } else {
+        // Fallback 2: Chemins communs sur Windows
+        if (PHP_OS_FAMILY === 'Windows') {
+            $commonPaths = [
+                'C:\Program Files\ImageMagick-7.1.1-Q16-HDRI\magick.exe',
+                'C:\Program Files\ImageMagick-7.1.0-Q16-HDRI\magick.exe',
+                'C:\Program Files\ImageMagick-7.0.10-Q16\magick.exe',
+                'C:\Program Files (x86)\ImageMagick-6.9.12-Q16\convert.exe',
+            ];
+            // On peut aussi essayer de chercher dynamiquement dans Program Files
+            $found = false;
+            foreach ($commonPaths as $p) {
+                if (file_exists($p)) {
+                    $cmdName = $p;
+                    $found = true;
+                    break;
+                }
+            }
+            
+            if (!$found) {
+                die("ImageMagick n'est pas détecté. Veuillez l'ajouter au PATH Windows ou définir MAGICK_PATH dans config/database.php.");
+            }
+        } else {
+            die("ImageMagick n'est pas installé ou n'est pas dans le PATH du système. Veuillez l'installer.");
+        }
     }
-    $cmdName = 'convert';
-} else {
-    $cmdName = 'magick';
 }
 
 // Forcer le type de contenu PDF
@@ -82,7 +108,7 @@ header('Content-Disposition: inline; filename="' . $filename . '"');
 
 // Exécuter ImageMagick
 // On utilise '-' pour envoyer le résultat sur la sortie standard (stdout)
-$command = sprintf('%s %s pdf:-', $cmdName, escapeshellarg($localPath));
+$command = sprintf('%s %s pdf:-', (strpos($cmdName, ' ') !== false ? '"'.$cmdName.'"' : $cmdName), escapeshellarg($localPath));
 
 passthru($command);
 exit;

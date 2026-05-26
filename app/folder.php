@@ -55,7 +55,7 @@ try {
     // Sous-dossiers directs
     if ($nom === '.') {
         $stmtFolders = $db->prepare("
-            SELECT id, nom, nb_images
+            SELECT id, nom, nb_images, modifie_le
             FROM sousdossiers
             WHERE matricule_id = :mid
               AND nom <> '.'
@@ -68,7 +68,7 @@ try {
         $like = $prefix . '%';
         $start = strlen($prefix) + 1; // 1-based
         $stmtFolders = $db->prepare("
-            SELECT id, nom, nb_images
+            SELECT id, nom, nb_images, modifie_le
             FROM sousdossiers
             WHERE matricule_id = :mid
               AND nom LIKE :like

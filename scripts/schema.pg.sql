@@ -8,6 +8,7 @@ CREATE TABLE matricules (
     nom             VARCHAR(150) NOT NULL UNIQUE,
     chemin          TEXT NOT NULL,
     nb_sousdossiers INTEGER DEFAULT 0,
+    modifie_le      BIGINT DEFAULT 0,
     indexe_le       TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -17,7 +18,8 @@ CREATE TABLE sousdossiers (
     matricule_id    BIGINT NOT NULL REFERENCES matricules(id) ON DELETE CASCADE,
     nom             VARCHAR(150) NOT NULL,
     chemin          TEXT NOT NULL,
-    nb_images       INTEGER DEFAULT 0
+    nb_images       INTEGER DEFAULT 0,
+    modifie_le      BIGINT DEFAULT 0
 );
 
 -- Table des images

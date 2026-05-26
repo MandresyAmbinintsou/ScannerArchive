@@ -33,6 +33,9 @@ if (!$defaultArchiveRoot) {
 }
 define('ARCHIVE_ROOT', $defaultArchiveRoot);
 
+$magickPath = getenv('MAGICK_PATH') ?: ($isWindows ? 'magick' : 'magick');
+define('MAGICK_PATH', $magickPath);
+
 /**
  * Retourne une instance PDO, crée la base et les tables si nécessaire.
  */
@@ -156,5 +159,24 @@ function ensureSchema(PDO $pdo): void {
         $pdo->exec("UPDATE users SET access_level = 2 WHERE (role <> 'admin' OR role IS NULL) AND (access_level IS NULL)");
         $pdo->exec("ALTER TABLE users ALTER COLUMN access_level SET DEFAULT 2");
         $pdo->exec("ALTER TABLE users ALTER COLUMN access_level SET NOT NULL");
+    }
+
+    // 4) modifie_le sur matricules
+    $stmtCol->execute([':col' => 'modifie_le']);
+    $stmtColTable = $pdo->prepare("
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = :table AND column_name = :col
+        LIMIT 1
+    ");
+    $stmtColTable->execute([':table' => 'matricules', ':col' => 'modifie_le']);
+    if (!$stmtColTable->fetchColumn()) {
+        $pdo->exec("ALTER TABLE matricules ADD COLUMN modifie_le BIGINT DEFAULT 0");
+    }
+
+    // 5) modifie_le sur sousdossiers
+    $stmtColTable->execute([':table' => 'sousdossiers', ':col' => 'modifie_le']);
+    if (!$stmtColTable->fetchColumn()) {
+        $pdo->exec("ALTER TABLE sousdossiers ADD COLUMN modifie_le BIGINT DEFAULT 0");
     }
 }

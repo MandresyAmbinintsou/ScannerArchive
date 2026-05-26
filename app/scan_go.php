@@ -119,6 +119,7 @@ function scanArchiveGo(PDO $db, string $archiveRoot, ?string $scannerPath = null
                 $name = (string)($m['name'] ?? '');
                 $path = (string)($m['path'] ?? '');
                 $sousCount = (int)($m['sous_count'] ?? 0);
+                $mtime = (int)($m['mtime'] ?? 0);
                 if ($name === '' || $path === '') { $warnings++; continue; }
 
                 // NOTE compat: ON CONFLICT nécessite PostgreSQL >= 9.5.
@@ -127,8 +128,8 @@ function scanArchiveGo(PDO $db, string $archiveRoot, ?string $scannerPath = null
                 try {
                     $matIdByName[$name] = insertAndGetId(
                         $db,
-                        'INSERT INTO matricules (nom, chemin, nb_sousdossiers) VALUES (?, ?, ?)',
-                        [$name, $path, $sousCount]
+                        'INSERT INTO matricules (nom, chemin, nb_sousdossiers, modifie_le) VALUES (?, ?, ?, ?)',
+                        [$name, $path, $sousCount, $mtime]
                     );
                 } catch (PDOException $e) {
                     $stmtSel = $db->prepare('SELECT id FROM matricules WHERE nom = ? LIMIT 1');
@@ -150,6 +151,7 @@ function scanArchiveGo(PDO $db, string $archiveRoot, ?string $scannerPath = null
                 $name = (string)($s['name'] ?? '');
                 $path = (string)($s['path'] ?? '');
                 $nbImages = (int)($s['images_count'] ?? 0);
+                $mtime = (int)($s['mtime'] ?? 0);
                 if ($matName === '' || $name === '' || $path === '') { $warnings++; continue; }
 
                 $matId = $matIdByName[$matName] ?? null;
@@ -157,8 +159,8 @@ function scanArchiveGo(PDO $db, string $archiveRoot, ?string $scannerPath = null
 
                 $sousId = insertAndGetId(
                     $db,
-                    'INSERT INTO sousdossiers (matricule_id, nom, chemin, nb_images) VALUES (?, ?, ?, ?)',
-                    [$matId, $name, $path, $nbImages]
+                    'INSERT INTO sousdossiers (matricule_id, nom, chemin, nb_images, modifie_le) VALUES (?, ?, ?, ?, ?)',
+                    [$matId, $name, $path, $nbImages, $mtime]
                 );
                 $sousIdByKey[$matName . "\n" . $name] = $sousId;
                 $totalSous++;

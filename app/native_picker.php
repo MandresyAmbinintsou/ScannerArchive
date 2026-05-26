@@ -41,22 +41,54 @@ function runCommand(string $command, int $timeoutSeconds = 60): array {
     return ['code' => (int)$code, 'out' => (string)$out, 'err' => (string)$err];
 }
 
+function privileged_file_exists($path) {
+    return !empty($path) && file_exists($path);
+}
+
 try {
     require_once __DIR__ . '/auth.php';
     require_once __DIR__ . '/../config/database.php';
     check_admin();
 
+    // Protection contre l'accès distant
+    $remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '';
+    $localIps = ['127.0.0.1', '::1', 'localhost', '::ffff:127.0.0.1'];
+    $isLocal = in_array($remoteAddr, $localIps, true);
+    
+    if (!$isLocal) {
+        echo json_encode(['ok' => false, 'message' => 'Accès distant détecté ('.$remoteAddr.'). Le sélecteur natif est réservé au serveur.'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
     $path = '';
 
     if (PHP_OS_FAMILY === 'Windows') {
-        // Utilisation d'un fichier script .ps1 pour éviter les problèmes d'injection et les alertes antivirus.
         $scriptPath = realpath(__DIR__ . '/../scripts/picker.ps1');
-        $cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File " . escapeshellarg($scriptPath);
+        if (!$scriptPath || !privileged_file_exists($scriptPath)) {
+            throw new RuntimeException("Script de sélection introuvable.");
+        }
+        
+        $scriptContent = file_get_contents($scriptPath);
+        
+        if (function_exists('mb_convert_encoding')) {
+            // PowerShell -EncodedCommand attend du UTF-16LE
+            $utf16Script = mb_convert_encoding($scriptContent, 'UTF-16LE', 'UTF-8');
+            $encodedScript = base64_encode($utf16Script);
+            $cmd = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " . $encodedScript;
+        } else {
+            // Fallback si mbstring est manquant
+            $cmd = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File " . escapeshellarg($scriptPath);
+        }
         
         $res = runCommand($cmd);
 
         if ($res['code'] !== 0) {
-            throw new RuntimeException("Le sélecteur n'a pas pu s'ouvrir. Veuillez saisir le chemin manuellement.");
+            $errorDetail = !empty($res['err']) ? $res['err'] : "Erreur inconnue (Code " . $res['code'] . ")";
+            $message = "Erreur PowerShell : " . $errorDetail;
+            if (stripos($errorDetail, 'denied') !== false || stripos($errorDetail, 'bloqué') !== false) {
+                $message .= "\n\nNote : L'exécution semble être bloquée par votre antivirus ou une politique de sécurité. Veuillez utiliser l'explorateur web intégré.";
+            }
+            throw new RuntimeException($message);
         }
         $path = trim($res['out']);
     } else {

@@ -102,9 +102,35 @@ if ($isIframe) {
             if (localStorage.theme === 'light') document.documentElement.classList.remove('dark');
         </script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
         <style>
             body { background: transparent !important; }
+            .swal2-popup { border-radius: 2rem !important; font-family: inherit !important; font-size: 0.8rem !important; }
+            .dark .swal2-popup { background-color: #0f172a !important; color: #f8fafc !important; border: 1px solid rgba(255,255,255,0.05) !important; }
+            .dark .swal2-title, .dark .swal2-html-container { color: #f8fafc !important; }
+            .swal2-confirm { background-color: #6366f1 !important; border-radius: 1rem !important; padding: 0.75rem 2rem !important; font-size: 0.7rem !important; font-weight: 900 !important; text-transform: uppercase !important; }
+            .swal2-cancel { background-color: #1e293b !important; border-radius: 1rem !important; padding: 0.75rem 2rem !important; font-size: 0.7rem !important; font-weight: 900 !important; text-transform: uppercase !important; }
+            .dark .swal2-cancel { background-color: #334155 !important; }
         </style>
+        <script>
+            window.confirmAction = function(message, onConfirm) {
+                Swal.fire({
+                    text: message,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Confirmer',
+                    cancelButtonText: 'Annuler',
+                    reverseButtons: true,
+                    customClass: {
+                        popup: document.documentElement.classList.contains('dark') ? 'dark' : ''
+                    }
+                }).then((result) => {
+                    if (result.isConfirmed && typeof onConfirm === 'function') {
+                        onConfirm();
+                    }
+                });
+            };
+        </script>
     </head>
     <body class="dark:text-white p-4">
     <?php
@@ -153,7 +179,7 @@ if ($isIframe) {
             <form method="post" class="space-y-6">
                 <div>
                     <label class="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Rôle Historique</label>
-                    <select name="role" class="w-full rounded-xl border-slate-200 bg-slate-50 dark:bg-slate-950 dark:border-white/10 text-sm font-bold">
+                    <select name="role" id="roleSelect" class="w-full rounded-xl border-slate-200 bg-slate-50 dark:bg-slate-950 dark:border-white/10 text-sm font-bold">
                         <option value="user" <?= $user['role'] === 'user' ? 'selected' : '' ?>>Utilisateur (user)</option>
                         <option value="admin" <?= $user['role'] === 'admin' ? 'selected' : '' ?>>Administrateur (admin)</option>
                     </select>
@@ -161,12 +187,43 @@ if ($isIframe) {
 
                 <div>
                     <label class="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Niveau d'Accès</label>
-                    <select name="access_level" class="w-full rounded-xl border-slate-200 bg-slate-50 dark:bg-slate-950 dark:border-white/10 text-sm font-bold">
-                        <option value="0" <?= $user['access_level'] == 0 ? 'selected' : '' ?>>N0 : Super Administrateur (Total)</option>
-                        <option value="1" <?= $user['access_level'] == 1 ? 'selected' : '' ?>>N1 : Administrateur (Indexation)</option>
-                        <option value="2" <?= $user['access_level'] == 2 ? 'selected' : '' ?>>N2 : Utilisateur (Consultation)</option>
+                    <select name="access_level" id="levelSelect" class="w-full rounded-xl border-slate-200 bg-slate-50 dark:bg-slate-950 dark:border-white/10 text-sm font-bold">
+                        <!-- Options générées par JS -->
                     </select>
                 </div>
+
+                <script>
+                    const roleSelect = document.getElementById('roleSelect');
+                    const levelSelect = document.getElementById('levelSelect');
+                    const currentLevel = <?= (int)$user['access_level'] ?>;
+
+                    const levels = {
+                        user: [
+                            { value: 2, label: 'N2 : Utilisateur (Consultation)' }
+                        ],
+                        admin: [
+                            { value: 0, label: 'N0 : Super Administrateur (Total)' },
+                            { value: 1, label: 'N1 : Administrateur (Indexation)' }
+                        ]
+                    };
+
+                    function updateLevels() {
+                        const role = roleSelect.value;
+                        const options = levels[role] || [];
+                        
+                        levelSelect.innerHTML = '';
+                        options.forEach(opt => {
+                            const o = document.createElement('option');
+                            o.value = opt.value;
+                            o.textContent = opt.label;
+                            if (opt.value === currentLevel) o.selected = true;
+                            levelSelect.appendChild(o);
+                        });
+                    }
+
+                    roleSelect.addEventListener('change', updateLevels);
+                    updateLevels(); // Initial call
+                </script>
 
                 <div class="flex items-center gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-white/5">
                     <input type="checkbox" id="is_approved" name="is_approved" <?= $user['is_approved'] ? 'checked' : '' ?> class="h-5 w-5 rounded border-slate-300 text-indigo-600">
@@ -195,7 +252,7 @@ if ($isIframe) {
 
             <section class="rounded-3xl border border-red-100 dark:border-red-900/20 bg-red-50/30 dark:bg-red-950/10 p-8">
                 <h3 class="text-[10px] font-black uppercase tracking-widest text-red-400 mb-8">Supression de Compte</h3>
-                <form method="post" onsubmit="return confirm('Supprimer définitivement ce compte ?');">
+                <form method="post" onsubmit="event.preventDefault(); confirmAction('Supprimer définitivement ce compte ?', () => this.submit());">
                     <button type="submit" name="delete_user" class="w-full rounded-xl bg-red-500 py-4 text-[10px] font-black uppercase tracking-widest text-white hover:bg-red-600 transition">
                         Supprimer le compte
                     </button>

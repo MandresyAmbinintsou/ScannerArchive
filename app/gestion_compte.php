@@ -9,14 +9,17 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
     $username = trim($_POST['new_username']);
     $password = $_POST['new_password'];
-    $role = (string)($_POST['new_role'] ?? '');
+    $role = (string)($_POST['role_hist'] ?? 'user'); // Utilise le rôle historique choisi
+    $level = (string)($_POST['new_role'] ?? '2');
 
-    if (empty($username) || empty($password) || !in_array($role, ['0', '1', '2', 'user', 'admin'], true)) {
-        $error = 'Tous les champs sont requis et le niveau doit être valide.';
-    } elseif (strlen($password) < 6) {
-        $error = 'Le mot de passe doit contenir au moins 6 caractères.';
+    if (empty($username) || empty($password)) {
+        $error = 'Tous les champs sont requis.';
+    } elseif (strlen($password) < 4) {
+        $error = 'Le mot de passe doit contenir au moins 4 caractères.';
     } else {
-        if (createUser($username, $password, $role, true)) {
+        // On passe le niveau d'accès choisi à createUser (qui normalisera via normalizeAccessParams si besoin, 
+        // mais ici on lui donne directement le niveau numérique final).
+        if (createUser($username, $password, $level, true)) {
             $message = 'Utilisateur créé avec succès.';
         } else {
             $error = 'Erreur lors de la création de l\'utilisateur. Le nom d\'utilisateur existe peut-être déjà.';
@@ -155,7 +158,7 @@ require_once __DIR__ . '/../app/header.php';
                                         <?php endif; ?>
 
                                         <?php if ($user['role'] !== 'admin' || $user['access_level'] != 0): ?>
-                                            <form method="POST" action="gestion_compte.php" onsubmit="return confirm('Supprimer ce compte ?');">
+                                            <form method="POST" action="gestion_compte.php" onsubmit="event.preventDefault(); confirmAction('Supprimer ce compte ?', () => this.submit());">
                                                 <button type="submit" name="reject_user_id" value="<?= (int)$user['id'] ?>"
                                                         class="h-10 w-10 rounded-xl bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-600 hover:text-white flex items-center justify-center transition"
                                                         title="Supprimer">
@@ -193,14 +196,50 @@ require_once __DIR__ . '/../app/header.php';
                                class="w-full rounded-2xl border-none bg-slate-50 dark:bg-slate-950 px-6 py-4 text-sm font-bold text-slate-900 dark:text-white shadow-inner focus:ring-4 focus:ring-indigo-600/10 transition">
                     </div>
                     <div class="space-y-3">
+                        <label for="new_role_hist" class="text-[10px] font-black uppercase tracking-widest text-slate-400">Rôle Historique</label>
+                        <select id="new_role_hist" name="role_hist" required
+                                class="w-full rounded-2xl border-none bg-slate-50 dark:bg-slate-950 px-6 py-4 text-sm font-bold text-slate-900 dark:text-white shadow-inner focus:ring-4 focus:ring-indigo-600/10 transition appearance-none">
+                            <option value="user">Utilisateur (user)</option>
+                            <option value="admin">Administrateur (admin)</option>
+                        </select>
+                    </div>
+                    <div class="space-y-3">
                         <label for="new_role" class="text-[10px] font-black uppercase tracking-widest text-slate-400">Niveau d'accès</label>
                         <select id="new_role" name="new_role" required
                                 class="w-full rounded-2xl border-none bg-slate-50 dark:bg-slate-950 px-6 py-4 text-sm font-bold text-slate-900 dark:text-white shadow-inner focus:ring-4 focus:ring-indigo-600/10 transition appearance-none">
-                            <option value="2">Niveau 2 : User</option>
-                            <option value="1">Niveau 1 : Admin (sans gestion comptes)</option>
-                            <option value="0">Niveau 0 : Superadmin (accès total)</option>
+                            <!-- Options générées par JS -->
                         </select>
                     </div>
+
+                    <script>
+                        const roleHistSelect = document.getElementById('new_role_hist');
+                        const accessLevelSelect = document.getElementById('new_role');
+
+                        const levelOptions = {
+                            user: [
+                                { value: 2, label: 'Niveau 2 : User' }
+                            ],
+                            admin: [
+                                { value: 0, label: 'Niveau 0 : Superadmin (accès total)' },
+                                { value: 1, label: 'Niveau 1 : Admin (sans gestion comptes)' }
+                            ]
+                        };
+
+                        function syncCreateLevels() {
+                            const role = roleHistSelect.value;
+                            const options = levelOptions[role] || [];
+                            accessLevelSelect.innerHTML = '';
+                            options.forEach(opt => {
+                                const o = document.createElement('option');
+                                o.value = opt.value;
+                                o.textContent = opt.label;
+                                accessLevelSelect.appendChild(o);
+                            });
+                        }
+
+                        roleHistSelect.addEventListener('change', syncCreateLevels);
+                        syncCreateLevels();
+                    </script>
                     <div class="md:col-span-3 flex justify-end">
                         <button type="submit" name="create_user" class="rounded-2xl bg-indigo-600 px-10 py-5 text-[11px] font-black uppercase tracking-widest text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 hover:scale-[1.02] transition">
                             Ajouter au système

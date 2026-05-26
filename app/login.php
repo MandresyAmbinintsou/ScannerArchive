@@ -113,6 +113,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <script>
+        // Initialize tab session on login page to allow transition to index
+        sessionStorage.setItem('tab_session_active', 'true');
+
         function togglePassword(id, btn) {
             const input = document.getElementById(id);
             const icon = btn.querySelector('i');

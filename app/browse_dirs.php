@@ -38,16 +38,53 @@ function listRoots(): array {
     }
 
     if (isWindowsOs()) {
-        foreach (range('A', 'Z') as $letter) {
-            $drive = $letter . ':\\';
-            if (@is_dir($drive)) {
-                $roots[] = ['name' => $drive, 'path' => $drive];
+        // Ajouter les dossiers spéciaux
+        $userProfile = getenv('USERPROFILE');
+        if ($userProfile) {
+            $specialDirs = [
+                'Bureau' => $userProfile . '\\Desktop',
+                'Documents' => $userProfile . '\\Documents',
+                'Téléchargements' => $userProfile . '\\Downloads'
+            ];
+            foreach ($specialDirs as $name => $path) {
+                if (@is_dir($path)) {
+                    $roots[] = [
+                        'name' => $name, 
+                        'path' => $path, 
+                        'special' => true,
+                        'mtime' => @filemtime($path) ?: 0,
+                        'date' => @filemtime($path) ? date('d/m/Y H:i', filemtime($path)) : '--'
+                    ];
+                }
+            }
+        }
+
+        // Pour les lecteurs, on ne vérifie que ceux qui sont "prêts" pour éviter les freezes (lecteurs réseau, CD-ROM vides)
+        // Utilisation de la commande 'fsutil fsinfo drives' pour lister les lettres
+        exec('fsutil fsinfo drives', $output, $returnVar);
+        $drivesStr = $output[0] ?? '';
+        
+        if ($drivesStr !== '') {
+            preg_match_all('/([A-Z]:\\\\)/', $drivesStr, $matches);
+            foreach ($matches[1] as $drive) {
+                // On tente un file_exists très rapide
+                if (@is_dir($drive)) {
+                    $roots[] = ['name' => $drive, 'path' => $drive, 'date' => '--'];
+                }
+            }
+        } else {
+            // Fallback classique si fsutil échoue
+            foreach (range('A', 'Z') as $letter) {
+                $drive = $letter . ':\\';
+                if (@is_dir($drive)) {
+                    $roots[] = ['name' => $drive, 'path' => $drive, 'date' => '--'];
+                }
             }
         }
         return $roots;
     }
 
-    $roots[] = ['name' => '/', 'path' => '/'];
+    $roots[] = ['name' => '/', 'path' => '/', 'date' => '--'];
     return $roots;
 }
 
@@ -81,6 +118,8 @@ try {
             $dirs[] = [
                 'name' => $item->getFilename(),
                 'path' => $item->getPathname(),
+                'mtime' => $item->getMTime(),
+                'date' => date('d/m/Y H:i', $item->getMTime()),
             ];
         }
     } catch (UnexpectedValueException $e) {

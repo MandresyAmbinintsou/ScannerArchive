@@ -24,7 +24,7 @@ try {
         // ILIKE est spécifique à PostgreSQL et permet une recherche insensible à la casse
         $countSql = 'SELECT COUNT(*) FROM matricules WHERE nom ILIKE ?';
         $dataSql  = '
-            SELECT id, nom, nb_sousdossiers
+            SELECT id, nom, nb_sousdossiers, modifie_le
             FROM matricules
             WHERE nom ILIKE ?
             ORDER BY nom
@@ -45,7 +45,7 @@ try {
     } else {
         $total = (int)$db->query('SELECT COUNT(*) FROM matricules')->fetchColumn();
 
-        $stmt = $db->prepare('SELECT id, nom, nb_sousdossiers FROM matricules ORDER BY nom LIMIT ? OFFSET ?');
+        $stmt = $db->prepare('SELECT id, nom, nb_sousdossiers, modifie_le FROM matricules ORDER BY nom LIMIT ? OFFSET ?');
         $stmt->bindValue(1, $limit, PDO::PARAM_INT);
         $stmt->bindValue(2, $offset, PDO::PARAM_INT);
         $stmt->execute();

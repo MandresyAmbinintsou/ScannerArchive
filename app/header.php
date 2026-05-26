@@ -33,6 +33,42 @@ $baseHref = $baseHref ?? '';
         }
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        .swal2-popup {
+            border-radius: 2rem !important;
+            font-family: inherit !important;
+        }
+        .dark .swal2-popup {
+            background-color: #0f172a !important; /* slate-900 */
+            color: #f8fafc !important; /* slate-50 */
+            border: 1px solid rgba(255,255,255,0.05) !important;
+        }
+        .dark .swal2-title, .dark .swal2-html-container {
+            color: #f8fafc !important;
+        }
+        .swal2-confirm {
+            background-color: #6366f1 !important; /* brand-indigo */
+            border-radius: 1rem !important;
+            padding: 0.75rem 2rem !important;
+            font-size: 0.8rem !important;
+            font-weight: 900 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.1em !important;
+        }
+        .swal2-cancel {
+            background-color: #1e293b !important; /* slate-800 */
+            border-radius: 1rem !important;
+            padding: 0.75rem 2rem !important;
+            font-size: 0.8rem !important;
+            font-weight: 900 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.1em !important;
+        }
+        .dark .swal2-cancel {
+            background-color: #334155 !important; /* slate-700 */
+        }
+    </style>
 </head>
 <body class="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 antialiased font-sans transition-colors duration-300">
 
@@ -95,15 +131,8 @@ $baseHref = $baseHref ?? '';
                                 <a href="<?= $baseHref ?>app/user_profil.php" class="flex items-center gap-4 px-4 py-3 rounded-2xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-indigo-600 dark:hover:text-white transition">
                                     <div class="h-8 w-8 rounded-xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center"><i class="fas fa-user-circle text-xs"></i></div>
                                     <div class="flex flex-col">
-                                        <span class="text-[10px] font-black uppercase tracking-widest">À propos</span>
-                                        <span class="text-[8px] font-bold opacity-50 uppercase">Voir mon profil</span>
-                                    </div>
-                                </a>
-                                <a href="<?= $baseHref ?>app/user_profil.php" class="flex items-center gap-4 px-4 py-3 rounded-2xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-indigo-600 dark:hover:text-white transition">
-                                    <div class="h-8 w-8 rounded-xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center"><i class="fas fa-lock text-xs"></i></div>
-                                    <div class="flex flex-col">
-                                        <span class="text-[10px] font-black uppercase tracking-widest">Mon mot de passe</span>
-                                        <span class="text-[8px] font-bold opacity-50 uppercase">Sécurité du compte</span>
+                                        <span class="text-[10px] font-black uppercase tracking-widest">Mon Profil</span>
+                                        <span class="text-[8px] font-bold opacity-50 uppercase">Gérer mon compte</span>
                                     </div>
                                 </a>
                                 <div class="my-2 border-t border-slate-100 dark:border-white/5 mx-4"></div>
@@ -143,12 +172,64 @@ $baseHref = $baseHref ?? '';
     <script>
         window.__BASE_HREF__ = <?= json_encode($baseHref, JSON_UNESCAPED_SLASHES) ?>;
         
+        // --- Surcharge des Alertes Natives ---
+        window.alert = function(message) {
+            Swal.fire({
+                text: message,
+                icon: 'info',
+                confirmButtonText: 'D\'accord',
+                customClass: {
+                    popup: document.documentElement.classList.contains('dark') ? 'dark' : ''
+                }
+            });
+        };
+
+        /**
+         * Helper pour remplacer confirm() de manière asynchrone
+         * @param {string} message 
+         * @param {function} onConfirm 
+         */
+        window.confirmAction = function(message, onConfirm) {
+            Swal.fire({
+                text: message,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Confirmer',
+                cancelButtonText: 'Annuler',
+                reverseButtons: true,
+                customClass: {
+                    popup: document.documentElement.classList.contains('dark') ? 'dark' : ''
+                }
+            }).then((result) => {
+                if (result.isConfirmed && typeof onConfirm === 'function') {
+                    onConfirm();
+                }
+            });
+        };
+
         // Theme Management
         const html = document.documentElement;
         const toggle = document.getElementById('themeToggle');
         
         if (localStorage.theme === 'light') {
             html.classList.remove('dark');
+        }
+
+        // Session Persistence Control (Tab/Browser close detection)
+        // If sessionStorage is empty, it's a new tab or the browser was restarted.
+        if (!sessionStorage.getItem('tab_session_active')) {
+            <?php if (isset($_SESSION['username'])): ?>
+                // If a PHP session exists but sessionStorage is empty, 
+                // it means the tab was closed and reopened. Force logout.
+                // Exception: if we just came from login.php (using referrer)
+                if (!document.referrer.includes('login.php')) {
+                    window.location.href = window.__BASE_HREF__ + "logout.php";
+                } else {
+                    sessionStorage.setItem('tab_session_active', 'true');
+                }
+            <?php else: ?>
+                sessionStorage.setItem('tab_session_active', 'true');
+            <?php endif; ?>
         }
 
         if (toggle) {
